@@ -2,7 +2,7 @@
 #*** Written in YAML
 #
 #========== nmeta Controller ========================
-nmeta_controller_address: http://172.16.0.3
+nmeta_controller_address: http://192.168.10.101 # Jarrod: changed from original value set by Matt
 nmeta_controller_port: 8080
 nmeta_api_path: nmeta/v2/aux/
 #
