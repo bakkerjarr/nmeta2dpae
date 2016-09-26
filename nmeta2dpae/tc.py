@@ -43,6 +43,18 @@ import flow
 #*** For importing custom classifiers:
 import importlib
 
+# Class variables containing protocol type values to reduce the amount
+# of referencing to modules.
+_ETH_TYPE_IP = dpkt.ethernet.ETH_TYPE_IP
+_ETH_TYPE_ARP = dpkt.ethernet.ETH_TYPE_ARP
+_ETH_TYPE_VLAN = dpkt.ethernet.ETH_TYPE_8021Q
+_ETH_TYPE_IP6 = dpkt.ethernet.ETH_TYPE_IP6
+_ETH_TYPE_LLDP = dpkt.ethernet.ETH_TYPE_LLDP
+_IP_PROTO_ICMP = dpkt.ip.IP_PROTO_ICMP
+_IP_PROTO_TCP = dpkt.ip.IP_PROTO_TCP
+_IP_PROTO_UDP = dpkt.ip.IP_PROTO_UDP
+
+
 class TC(object):
     """
     This class is instantiated by nmeta2_dpae.py and provides methods
@@ -50,6 +62,7 @@ class TC(object):
     packets against policy, calling appropriate classifiers
     and returning actions.
     """
+
     def __init__(self, _config):
         #*** Get logging config values from config class:
         _logging_level_s = _config.get_value \
@@ -175,6 +188,7 @@ class TC(object):
         ip = 0
         udp = 0
         tcp = 0
+        icmp = 0
         #*** Read into dpkt:
         eth = dpkt.ethernet.Ethernet(pkt)
         #*** Set local variables for efficient access, speed is critical...
@@ -182,20 +196,23 @@ class TC(object):
         eth_dst = mac_addr(eth.dst)
         eth_type = eth.type
 
-        if eth_type == 2048:
+        if eth_type == _ETH_TYPE_IP:
             ip = eth.data
             ip_src = socket.inet_ntop(socket.AF_INET, ip.src)
             ip_dst = socket.inet_ntop(socket.AF_INET, ip.dst)
             #*** Check if UDP or TCP:
-            if ip.p == 6:
+            if ip.p == _IP_PROTO_TCP:
                 tcp = ip.data
                 tcp_src = tcp.sport
                 tcp_dst = tcp.dport
 
-            elif ip.p == 17:
+            elif ip.p == _IP_PROTO_UDP:
                 udp = ip.data
                 udp_src = udp.sport
                 udp_dst = udp.dport
+            elif ip.p == _IP_PROTO_ICMP:
+                # TODO Implement
+                pass
 
         #*** Check for Identity Indicators:
         if udp:
@@ -212,16 +229,16 @@ class TC(object):
                 #*** DNS (TCP):
                 return self._parse_dns(tcp.data, eth_src)
 
-        if eth_type == 35020:
+        if eth_type == _ETH_TYPE_LLDP:
             #*** LLDP:
             return self._parse_lldp(pkt, eth_src)
 
-        if eth_type == 2054:
+        if eth_type == _ETH_TYPE_ARP:
             #*** ARP:
             return self._parse_arp(eth, eth_src)
 
         #*** The following is TCP specific but shouldn't be... TBD...
-        if tcp:
+        if tcp or udp or icmp:
             #*** Read packet into flow object for classifiers to work with:
             self.flow.ingest_packet(pkt, pkt_receive_timestamp)
 

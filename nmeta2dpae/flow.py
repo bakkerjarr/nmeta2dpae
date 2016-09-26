@@ -35,6 +35,18 @@ from pymongo import MongoClient
 #*** For hashing flow 5-tuples:
 import hashlib
 
+# Class variables containing protocol type values to reduce the amount
+# of referencing to modules.
+_ETH_TYPE_IP = dpkt.ethernet.ETH_TYPE_IP
+_ETH_TYPE_ARP = dpkt.ethernet.ETH_TYPE_ARP
+_ETH_TYPE_VLAN = dpkt.ethernet.ETH_TYPE_8021Q
+_ETH_TYPE_IP6 = dpkt.ethernet.ETH_TYPE_IP6
+_ETH_TYPE_LLDP = dpkt.ethernet.ETH_TYPE_LLDP
+_IP_PROTO_ICMP = dpkt.ip.IP_PROTO_ICMP
+_IP_PROTO_TCP = dpkt.ip.IP_PROTO_TCP
+_IP_PROTO_UDP = dpkt.ip.IP_PROTO_UDP
+
+
 class Flow(object):
     """
     An object that represents a flow that we are classifying
@@ -159,14 +171,15 @@ class Flow(object):
         eth_dst = _mac_addr(eth.dst)
         eth_type = eth.type
         #*** We only support IPv4 (TBD: add IPv6 support):
-        if eth_type != 2048:
+        if eth_type != _ETH_TYPE_IP:
             self.logger.error("Non IPv4 packet, eth_type is %s", eth_type)
             return 0
         ip = eth.data
         self.ip_src = socket.inet_ntop(socket.AF_INET, ip.src)
         self.ip_dst = socket.inet_ntop(socket.AF_INET, ip.dst)
+        # TODO divide up for UDP
         #*** We only support TCP:
-        if ip.p != 6:
+        if ip.p != _IP_PROTO_TCP:
             self.logger.error("Non TCP packet, ip_proto=%s",
                                         ip.p)
             return 0
