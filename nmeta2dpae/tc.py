@@ -38,7 +38,7 @@ import struct
 import dpkt
 
 #*** To represent TCP flows and their context:
-import flow
+from flow import tcp_flow
 
 #*** For importing custom classifiers:
 import importlib
@@ -126,7 +126,8 @@ class TC(object):
         _mongo_addr = _config.get_value("mongo_addr")
         _mongo_port = _config.get_value("mongo_port")
         #*** Instantiate a flow object for classifiers to work with:
-        self.flow = flow.Flow(self.logger, _mongo_addr, _mongo_port)
+        self.tcp_flow = tcp_flow.TCPFlow(self.logger, _mongo_addr,
+                                         _mongo_port)
 
     def instantiate_classifiers(self, _classifiers):
         """
@@ -240,12 +241,12 @@ class TC(object):
         #*** The following is TCP specific but shouldn't be... TBD...
         if tcp or udp or icmp:
             #*** Read packet into flow object for classifiers to work with:
-            self.flow.ingest_packet(pkt, pkt_receive_timestamp)
+            self.tcp_flow.ingest_packet(pkt, pkt_receive_timestamp)
 
             #*** Run any custom classifiers:
             for classifier in self.classifiers:
                 try:
-                    result_classifier = classifier.classifier(self.flow)
+                    result_classifier = classifier.classifier(self.tcp_flow)
                 except:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     self.logger.error("Exception in custom classifier %s."
@@ -261,23 +262,23 @@ class TC(object):
 
         #*** Suppress Elephant flows:
         #***  TBD, do on more than just IPv4 TCP...:
-        if tcp and self.flow.packet_count >= \
+        if tcp and self.tcp_flow.packet_count >= \
                                 self.suppress_flow_pkt_count_initial:
             self.logger.debug("Flow is candidate for suppression src_ip=%s "
                                     "src_port=%s dst_ip=%s dst_port=%s",
-                                    self.flow.ip_src, self.flow.tcp_src,
-                                    self.flow.ip_dst, self.flow.tcp_dst)
+                              self.tcp_flow.ip_src, self.tcp_flow.tcp_src,
+                              self.tcp_flow.ip_dst, self.tcp_flow.tcp_dst)
             #*** Only suppress if there's been sufficient backoff since
             #***  any previous suppressions to prevent overload of ctrlr
-            if not self.flow.suppressed or (self.flow.packet_count > \
-                            (self.flow.suppressed + \
+            if not self.tcp_flow.suppressed or (self.tcp_flow.packet_count > \
+                            (self.tcp_flow.suppressed + \
                             self.suppress_flow_pkt_count_backoff)):
                 #*** Update the suppress counter on the flow:
-                self.flow.set_suppress_flow()
+                self.tcp_flow.set_suppress_flow()
                 self.logger.debug("Suppressing TCP stream src_ip=%s "
                                     "src_port=%s dst_ip=%s dst_port=%s",
-                                    self.flow.ip_src, self.flow.tcp_src,
-                                    self.flow.ip_dst, self.flow.tcp_dst)
+                                  self.tcp_flow.ip_src, self.tcp_flow.tcp_src,
+                                  self.tcp_flow.ip_dst, self.tcp_flow.tcp_dst)
                 if result['type'] == 'none':
                     result['type'] = 'suppress'
                 elif result['type'] == 'treatment':
@@ -287,19 +288,19 @@ class TC(object):
             else:
                 self.logger.debug("Deferring suppression TCP stream src_ip=%s "
                                     "src_port=%s dst_ip=%s dst_port=%s",
-                                    self.flow.ip_src, self.flow.tcp_src,
-                                    self.flow.ip_dst, self.flow.tcp_dst)
+                                  self.tcp_flow.ip_src, self.tcp_flow.tcp_src,
+                                  self.tcp_flow.ip_dst, self.tcp_flow.tcp_dst)
                 self.logger.debug("    self.flow.suppressed=%s",
-                                        self.flow.suppressed)
+                                  self.tcp_flow.suppressed)
 
         if result['type'] != 'none':
             #*** Add context to result:
-            result['ip_A'] = self.flow.ip_src
-            result['ip_B'] = self.flow.ip_dst
+            result['ip_A'] = self.tcp_flow.ip_src
+            result['ip_B'] = self.tcp_flow.ip_dst
             result['proto'] = 'tcp'
-            result['tp_A'] = self.flow.tcp_src
-            result['tp_B'] = self.flow.tcp_dst
-            result['flow_packets'] = self.flow.packet_count
+            result['tp_A'] = self.tcp_flow.tcp_src
+            result['tp_B'] = self.tcp_flow.tcp_dst
+            result['flow_packets'] = self.tcp_flow.packet_count
 
         return result
 
