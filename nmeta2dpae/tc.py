@@ -38,6 +38,7 @@ import struct
 import dpkt
 
 # To represent various flows types and their appropriate context
+from flow import icmp_flow
 from flow import tcp_flow
 from flow import udp_flow
 
@@ -127,6 +128,8 @@ class TC(object):
         _mongo_addr = _config.get_value("mongo_addr")
         _mongo_port = _config.get_value("mongo_port")
         # Instantiate flow objecta for classifiers to work with:
+        self.icmp_flow = icmp_flow.ICMPFlow(self.logger, _mongo_addr,
+                                            _mongo_port)
         self.tcp_flow = tcp_flow.TCPFlow(self.logger, _mongo_addr,
                                          _mongo_port)
         self.udp_flow = udp_flow.UDPFlow(self.logger, _mongo_addr,
@@ -215,8 +218,7 @@ class TC(object):
                 udp_src = udp.sport
                 udp_dst = udp.dport
             elif ip.p == _IP_PROTO_ICMP:
-                # TODO Implement
-                pass
+                icmp = ip.id
 
         #*** Check for Identity Indicators:
         if udp:
@@ -242,7 +244,7 @@ class TC(object):
             return self._parse_arp(eth, eth_src)
 
         # The following only handles TCP, UDP and ICMP
-        if tcp or udp:
+        if tcp or udp or icmp:
             # Read the packet into the correct flow object and store
             # for classifiers.
             if tcp:
@@ -253,8 +255,8 @@ class TC(object):
                 flow_type = self.udp_flow
             else:
                 # The packet is ICMP
-                print("\n\nI SHOULDN'T BE HERE\n\n")
-                flow_type = None
+                self.icmp_flow.ingest_packet(pkt, pkt_receive_timestamp)
+                flow_type = self.icmp_flow
 
              #*** Run any custom classifiers:
             for classifier in self.classifiers:
