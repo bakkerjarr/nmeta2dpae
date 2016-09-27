@@ -59,8 +59,8 @@ class UDPFlow(flow.Flow):
         # Variables for the current packet:
         flow.ip_src         # IP source address of latest packet in flow
         flow.ip_dst         # IP dest address of latest packet in flow
-        flow.udp_src        # TCP source port of latest packet in flow
-        flow.udp_dst        # TCP dest port of latest packet in flow
+        flow.udp_src        # UDP source port of latest packet in flow
+        flow.udp_dst        # UDP dest port of latest packet in flow
 
         flow.payload        # Payload of UDP of latest packet in flow
         flow.packet_length  # Length in bytes of the current packet on wire
@@ -96,7 +96,7 @@ class UDPFlow(flow.Flow):
         Passed layer 3/4 parameters. Add an entry to the FCIP database
         if it doesn't already exist. If it does exist, update it.
 
-        This is specific to TCP.
+        This is specific to UDP.
         """
         flow.Flow.__init__(self)
         self.logger = logger
@@ -218,7 +218,7 @@ class UDPFlow(flow.Flow):
                 self.logger.debug("Finalising...")
             #*** Read suppressed status to variable:
             self.suppressed = self.fcip_doc['suppressed']
-            #*** Add packet timestamps, tcp flags etc:
+            # Add packet timestamps and other packet context:
             self.fcip_doc['packet_timestamps'].append(pkt_receive_timestamp)
             self.fcip_doc['packet_lengths'].append(self.packet_length)
             self.fcip_doc['packet_directions'].append(self.packet_direction)

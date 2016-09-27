@@ -235,7 +235,7 @@ class TCPFlow(flow.Flow):
                 self.logger.debug("Finalising...")
             #*** Read suppressed status to variable:
             self.suppressed = self.fcip_doc['suppressed']
-            #*** Add packet timestamps, tcp flags etc:
+            # Add packet timestamps and other packet context
             self.fcip_doc['packet_timestamps'].append(pkt_receive_timestamp)
             self.fcip_doc['tcp_flags'].append(tcp.flags)
             self.fcip_doc['packet_lengths'].append(self.packet_length)
