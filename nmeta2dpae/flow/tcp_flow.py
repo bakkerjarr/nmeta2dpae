@@ -128,12 +128,13 @@ class TCPFlow(flow.Flow):
         #*** Connect to specific databases and collections in mongodb:
         #*** FCIP (Flow Classification in Progress) database:
         db_fcip = mongo_client.fcip_database
-        self.fcip = db_fcip.fcip # MAKE TCP SPECIFIC
+        self.fcip = db_fcip.fcip_tcp
 
         #*** DPAE database - delete all previous entries:
         result = self.fcip.delete_many({})
-        self.logger.info("Initialising FCIP database, Deleted %s previous "
-                "entries from dbdpae", result.deleted_count)
+        self.logger.info("Initialising FCIP database, Deleted %s "
+                         "previous entries from fcip_database",
+                         result.deleted_count)
 
         #*** Database index for performance:
         self.fcip.create_index([("hash", 1)])
@@ -159,10 +160,9 @@ class TCPFlow(flow.Flow):
         self.ip_src = socket.inet_ntop(socket.AF_INET, ip.src)
         self.ip_dst = socket.inet_ntop(socket.AF_INET, ip.dst)
 
-        #*** We only support TCP:
+        # This class only supports TCP:
         if ip.p != _IP_PROTO_TCP:
-            self.logger.error("Non TCP packet, ip_proto=%s",
-                                        ip.p)
+            self.logger.error("Non TCP packet, ip_proto=%s", ip.p)
             return 0
         proto = 'tcp'
         tcp = ip.data
