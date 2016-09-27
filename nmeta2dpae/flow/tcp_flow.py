@@ -57,43 +57,43 @@ class TCPFlow(flow.Flow):
     an object called 'flow'):
 
         # Variables for the current packet:
-        flow.ip_src         # IP source address of latest packet in flow
-        flow.ip_dst         # IP dest address of latest packet in flow
-        flow.tcp_src        # TCP source port of latest packet in flow
-        flow.tcp_dst        # TCP dest port of latest packet in flow
-        flow.tcp_seq        # TCP sequence number of latest packet in flow
-        flow.tcp_acq        # TCP acknowledgement number of latest
+        tcp.ip_src         # IP source address of latest packet in flow
+        tcp.ip_dst         # IP dest address of latest packet in flow
+        tcp.tcp_src        # TCP source port of latest packet in flow
+        tcp.tcp_dst        # TCP dest port of latest packet in flow
+        tcp.tcp_seq        # TCP sequence number of latest packet in flow
+        tcp.tcp_acq        # TCP acknowledgement number of latest
                             #  packet in flow
 
-        flow.tcp_fin()      # True if TCP FIN flag is set in the current packet
-        flow.tcp_syn()      # True if TCP SYN flag is set in the current packet
-        flow.tcp_rst()      # True if TCP RST flag is set in the current packet
-        flow.tcp_psh()      # True if TCP PSH flag is set in the current packet
-        flow.tcp_ack()      # True if TCP ACK flag is set in the current packet
-        flow.tcp_urg()      # True if TCP URG flag is set in the current packet
-        flow.tcp_ece()      # True if TCP ECE flag is set in the current packet
-        flow.tcp_cwr()      # True if TCP CWR flag is set in the current packet
-        flow.payload        # Payload of TCP of latest packet in flow
-        flow.packet_length  # Length in bytes of the current packet on wire
-        flow.packet_direction   # c2s (client to server), s2c or unknown
+        tcp.tcp_fin()      # True if TCP FIN flag is set in the current packet
+        tcp.tcp_syn()      # True if TCP SYN flag is set in the current packet
+        tcp.tcp_rst()      # True if TCP RST flag is set in the current packet
+        tcp.tcp_psh()      # True if TCP PSH flag is set in the current packet
+        tcp.tcp_ack()      # True if TCP ACK flag is set in the current packet
+        tcp.tcp_urg()      # True if TCP URG flag is set in the current packet
+        tcp.tcp_ece()      # True if TCP ECE flag is set in the current packet
+        tcp.tcp_cwr()      # True if TCP CWR flag is set in the current packet
+        tcp.payload        # Payload of TCP of latest packet in flow
+        tcp.packet_length  # Length in bytes of the current packet on wire
+        tcp.packet_direction   # c2s (client to server), s2c or unknown
 
         # Variables for the whole flow:
-        flow.finalised      # A classification has been made
-        flow.suppressed     # The flow packet count number when
+        tcp.finalised      # A classification has been made
+        tcp.suppressed     # The flow packet count number when
                             #  a request was made to controller to not see
                             #  further packets in this flow. 0 is
                             #  not suppressed
-        flow.packet_count   # Unique packets registered for the flow
-        flow.client         # The IP that is the originator of the TCP
+        tcp.packet_count   # Unique packets registered for the flow
+        tcp.client         # The IP that is the originator of the TCP
                             #  session (if known, otherwise 0)
-        flow.server         # The IP that is the destination of the TCP
+        tcp.server         # The IP that is the destination of the TCP
                             # session (if known, otherwise 0)
 
     Methods available for Classifiers (assumes class instantiated as
     an object called 'flow'):
-        flow.max_packet_size()           # Size of largest packet in the flow
-        flow.max_interpacket_interval()  # TBD
-        flow.min_interpacket_interval()  # TBD
+        tcp.max_packet_size()           # Size of largest packet in the flow
+        tcp.max_interpacket_interval()  # TBD
+        tcp.min_interpacket_interval()  # TBD
 
     Challenges:
      - duplicate packets

@@ -57,32 +57,32 @@ class UDPFlow(flow.Flow):
     an object called 'flow'):
 
         # Variables for the current packet:
-        flow.ip_src         # IP source address of latest packet in flow
-        flow.ip_dst         # IP dest address of latest packet in flow
-        flow.udp_src        # UDP source port of latest packet in flow
-        flow.udp_dst        # UDP dest port of latest packet in flow
+        udp.ip_src         # IP source address of latest packet in flow
+        udp.ip_dst         # IP dest address of latest packet in flow
+        udp.udp_src        # UDP source port of latest packet in flow
+        udp.udp_dst        # UDP dest port of latest packet in flow
 
-        flow.payload        # Payload of UDP of latest packet in flow
-        flow.packet_length  # Length in bytes of the current packet on wire
-        flow.packet_direction   # c2s (client to server), s2c or unknown
+        udp.payload        # Payload of UDP of latest packet in flow
+        udp.packet_length  # Length in bytes of the current packet on wire
+        udp.packet_direction   # c2s (client to server), s2c or unknown
 
         # Variables for the whole flow:
-        flow.finalised      # A classification has been made
-        flow.suppressed     # The flow packet count number when
+        udp.finalised      # A classification has been made
+        udp.suppressed     # The flow packet count number when
                             #  a request was made to controller to not see
                             #  further packets in this flow. 0 is
                             #  not suppressed
-        flow.packet_count   # Unique packets registered for the flow
-        flow.client         # The IP that is the originator of the UDP
+        udp.packet_count   # Unique packets registered for the flow
+        udp.client         # The IP that is the originator of the UDP
                             #  session (if known, otherwise 0)
-        flow.server         # The IP that is the destination of the UDP
+        udp.server         # The IP that is the destination of the UDP
                             # session (if known, otherwise 0)
 
     Methods available for Classifiers (assumes class instantiated as
     an object called 'flow'):
-        flow.max_packet_size()           # Size of largest packet in the flow
-        flow.max_interpacket_interval()  # TBD
-        flow.min_interpacket_interval()  # TBD
+        udp.max_packet_size()           # Size of largest packet in the flow
+        udp.max_interpacket_interval()  # TBD
+        udp.min_interpacket_interval()  # TBD
 
     Challenges:
      - duplicate packets
