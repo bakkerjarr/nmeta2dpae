@@ -37,8 +37,9 @@ import struct
 #*** Import dpkt for packet parsing:
 import dpkt
 
-#*** To represent TCP flows and their context:
+# To represent various flows types and their appropriate context
 from flow import tcp_flow
+from flow import udp_flow
 
 #*** For importing custom classifiers:
 import importlib
@@ -125,8 +126,10 @@ class TC(object):
         #*** Retrieve config values for flow class db connection to use:
         _mongo_addr = _config.get_value("mongo_addr")
         _mongo_port = _config.get_value("mongo_port")
-        #*** Instantiate a flow object for classifiers to work with:
+        # Instantiate flow objecta for classifiers to work with:
         self.tcp_flow = tcp_flow.TCPFlow(self.logger, _mongo_addr,
+                                         _mongo_port)
+        self.udp_flow = udp_flow.UDPFlow(self.logger, _mongo_addr,
                                          _mongo_port)
 
     def instantiate_classifiers(self, _classifiers):
@@ -201,7 +204,7 @@ class TC(object):
             ip = eth.data
             ip_src = socket.inet_ntop(socket.AF_INET, ip.src)
             ip_dst = socket.inet_ntop(socket.AF_INET, ip.dst)
-            #*** Check if UDP or TCP:
+            # Check if TCP, UDP or ICMP
             if ip.p == _IP_PROTO_TCP:
                 tcp = ip.data
                 tcp_src = tcp.sport
@@ -238,15 +241,25 @@ class TC(object):
             #*** ARP:
             return self._parse_arp(eth, eth_src)
 
-        #*** The following is TCP specific but shouldn't be... TBD...
-        if tcp or udp or icmp:
-            #*** Read packet into flow object for classifiers to work with:
-            self.tcp_flow.ingest_packet(pkt, pkt_receive_timestamp)
+        # The following only handles TCP, UDP and ICMP
+        if tcp or udp:
+            # Read the packet into the correct flow object and store
+            # for classifiers.
+            if tcp:
+                self.tcp_flow.ingest_packet(pkt, pkt_receive_timestamp)
+                flow_type = self.tcp_flow
+            elif udp:
+                self.udp_flow.ingest_packet(pkt, pkt_receive_timestamp)
+                flow_type = self.udp_flow
+            else:
+                # The packet is ICMP
+                print("\n\nI SHOULDN'T BE HERE\n\n")
+                flow_type = None
 
-            #*** Run any custom classifiers:
+             #*** Run any custom classifiers:
             for classifier in self.classifiers:
                 try:
-                    result_classifier = classifier.classifier(self.tcp_flow)
+                    result_classifier = classifier.classifier(flow_type)
                 except:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     self.logger.error("Exception in custom classifier %s."
@@ -295,12 +308,20 @@ class TC(object):
 
         if result['type'] != 'none':
             #*** Add context to result:
-            result['ip_A'] = self.tcp_flow.ip_src
-            result['ip_B'] = self.tcp_flow.ip_dst
-            result['proto'] = 'tcp'
-            result['tp_A'] = self.tcp_flow.tcp_src
-            result['tp_B'] = self.tcp_flow.tcp_dst
-            result['flow_packets'] = self.tcp_flow.packet_count
+            if tcp:
+                result['ip_A'] = self.tcp_flow.ip_src
+                result['ip_B'] = self.tcp_flow.ip_dst
+                result['proto'] = 'tcp'
+                result['tp_A'] = self.tcp_flow.tcp_src
+                result['tp_B'] = self.tcp_flow.tcp_dst
+                result['flow_packets'] = self.tcp_flow.packet_count
+            elif udp:
+                result['ip_A'] = self.udp_flow.ip_src
+                result['ip_B'] = self.udp_flow.ip_dst
+                result['proto'] = 'udp'
+                result['tp_A'] = self.udp_flow.udp_src
+                result['tp_B'] = self.udp_flow.udp_dst
+                result['flow_packets'] = self.tcp_flow.packet_count
 
         return result
 
@@ -454,6 +475,7 @@ class TC(object):
             lldpPayload = lldpPayload[2 + tlv_len:]
 
         return (system_name, port_id)
+
 
 def mac_addr(address):
     """
