@@ -323,7 +323,14 @@ class TC(object):
                 result['proto'] = 'udp'
                 result['tp_A'] = self.udp_flow.udp_src
                 result['tp_B'] = self.udp_flow.udp_dst
-                result['flow_packets'] = self.tcp_flow.packet_count
+                result['flow_packets'] = self.udp_flow.packet_count
+            elif icmp:
+                result['ip_A'] = self.icmp_flow.ip_src
+                result['ip_B'] = self.icmp_flow.ip_dst
+                result['proto'] = 'icmp'
+                result['tp_A'] = "N/A"
+                result['tp_B'] = "N/A"
+                result['flow_packets'] = self.icmp_flow.packet_count
 
         return result
 
