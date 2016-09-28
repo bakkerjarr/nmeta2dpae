@@ -178,7 +178,12 @@ class UDPFlow(flow.Flow):
                         'finalised': 0,
                         'packet_count': 1,
                         'packet_timestamps': [pkt_receive_timestamp,],
+                        'latest_timestamp': pkt_receive_timestamp,
                         'packet_lengths': [self.packet_length,],
+                        'total_pkt_len_A': self.packet_length,
+                        'total_pkt_cnt_A': 1,
+                        'total_pkt_len_B': 0,
+                        'total_pkt_cnt_B': 0,
                         'client': self.client,
                         'server': self.server,
                         'packet_directions': ['c2s',],
@@ -189,13 +194,26 @@ class UDPFlow(flow.Flow):
             self.packet_count = 1
 
         elif self.fcip_doc['finalised']:
-            #*** The flow is already finalised just increment packet count:
+            # The flow is finalised so we need to update: directional
+            # packet lengths, directional packet counts, total packet
+            # count and the latest timestamp.
+            self.fcip_doc['latest_timestamp'] = pkt_receive_timestamp
             self.fcip_doc['packet_count'] += 1
+            if self.fcip_doc['ip_A'] == self.ip_src:
+                self.fcip_doc['total_pkt_len_A'] += self.packet_length
+                self.fcip_doc['total_pkt_cnt_A'] += 1
+            else:
+                self.fcip_doc['total_pkt_len_B'] += self.packet_length
+                self.fcip_doc['total_pkt_cnt_B'] += 1
             #*** Write updated FCIP data back to database:
             db_result = self.fcip.update_one({'hash': self.fcip_hash},
-                                             {'$set': {'packet_count':
-                                              self.fcip_doc[
-                                                 'packet_count']},})
+                {'$set': {'packet_count': self.fcip_doc['packet_count'],
+                          'latest_timestamp': self.fcip_doc['latest_timestamp'],
+                          'total_pkt_len_A': self.fcip_doc['total_pkt_len_A'],
+                          'total_pkt_cnt_A': self.fcip_doc['total_pkt_cnt_A'],
+                          'total_pkt_len_B': self.fcip_doc['total_pkt_len_B'],
+                          'total_pkt_cnt_B': self.fcip_doc['total_pkt_cnt_B']
+                          },})
             self.packet_count = self.fcip_doc['packet_count']
 
         else:
@@ -209,6 +227,14 @@ class UDPFlow(flow.Flow):
                 self.packet_direction = 's2c'
             else:
                 self.packet_direction = 'unknown'
+            # Determine if the packet length and count should be
+            # incremented for _A or _B
+            if self.fcip_doc['ip_A'] == self.ip_src:
+                self.fcip_doc['total_pkt_len_A'] += self.packet_length
+                self.fcip_doc['total_pkt_cnt_A'] += 1
+            else:
+                self.fcip_doc['total_pkt_len_B'] += self.packet_length
+                self.fcip_doc['total_pkt_cnt_B'] += 1
             #*** Increment packet count. Is it at max?:
             self.fcip_doc['packet_count'] += 1
             self.packet_count = self.fcip_doc['packet_count']
@@ -220,6 +246,7 @@ class UDPFlow(flow.Flow):
             self.suppressed = self.fcip_doc['suppressed']
             # Add packet timestamps and other packet context:
             self.fcip_doc['packet_timestamps'].append(pkt_receive_timestamp)
+            self.fcip_doc['latest_timestamp'] = pkt_receive_timestamp
             self.fcip_doc['packet_lengths'].append(self.packet_length)
             self.fcip_doc['packet_directions'].append(self.packet_direction)
             #*** Write updated FCIP data back to database:
@@ -227,9 +254,14 @@ class UDPFlow(flow.Flow):
                 {'$set': {'packet_count': self.fcip_doc['packet_count'],
                     'finalised': self.fcip_doc['finalised'],
                     'packet_timestamps': self.fcip_doc['packet_timestamps'],
+                    'latest_timestamp': self.fcip_doc['latest_timestamp'],
                     'packet_lengths': self.fcip_doc['packet_lengths'],
+                    'total_pkt_len_A': self.fcip_doc['total_pkt_len_A'],
+                    'total_pkt_cnt_A': self.fcip_doc['total_pkt_cnt_A'],
+                    'total_pkt_len_B': self.fcip_doc['total_pkt_len_B'],
+                    'total_pkt_cnt_B': self.fcip_doc['total_pkt_cnt_B'],
                     'packet_directions': self.fcip_doc['packet_directions']
-                        },})
+                },})
             #*** Tests:
             self.logger.debug("max_packet_size is %s", self.max_packet_size())
             self.logger.debug("max_interpacket_interval is %s",
