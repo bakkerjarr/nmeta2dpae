@@ -37,11 +37,25 @@ import struct
 #*** Import dpkt for packet parsing:
 import dpkt
 
-#*** To represent TCP flows and their context:
-import flow
+# To represent various flows types and their appropriate context
+from flow import icmp_flow
+from flow import tcp_flow
+from flow import udp_flow
 
 #*** For importing custom classifiers:
 import importlib
+
+# Class variables containing protocol type values to reduce the amount
+# of referencing to modules.
+_ETH_TYPE_IP = dpkt.ethernet.ETH_TYPE_IP
+_ETH_TYPE_ARP = dpkt.ethernet.ETH_TYPE_ARP
+_ETH_TYPE_VLAN = dpkt.ethernet.ETH_TYPE_8021Q
+_ETH_TYPE_IP6 = dpkt.ethernet.ETH_TYPE_IP6
+_ETH_TYPE_LLDP = dpkt.ethernet.ETH_TYPE_LLDP
+_IP_PROTO_ICMP = dpkt.ip.IP_PROTO_ICMP
+_IP_PROTO_TCP = dpkt.ip.IP_PROTO_TCP
+_IP_PROTO_UDP = dpkt.ip.IP_PROTO_UDP
+
 
 class TC(object):
     """
@@ -50,6 +64,7 @@ class TC(object):
     packets against policy, calling appropriate classifiers
     and returning actions.
     """
+
     def __init__(self, _config):
         #*** Get logging config values from config class:
         _logging_level_s = _config.get_value \
@@ -112,8 +127,13 @@ class TC(object):
         #*** Retrieve config values for flow class db connection to use:
         _mongo_addr = _config.get_value("mongo_addr")
         _mongo_port = _config.get_value("mongo_port")
-        #*** Instantiate a flow object for classifiers to work with:
-        self.flow = flow.Flow(self.logger, _mongo_addr, _mongo_port)
+        # Instantiate flow objecta for classifiers to work with:
+        self.icmp_flow = icmp_flow.ICMPFlow(self.logger, _mongo_addr,
+                                            _mongo_port)
+        self.tcp_flow = tcp_flow.TCPFlow(self.logger, _mongo_addr,
+                                         _mongo_port)
+        self.udp_flow = udp_flow.UDPFlow(self.logger, _mongo_addr,
+                                         _mongo_port)
 
     def instantiate_classifiers(self, _classifiers):
         """
@@ -175,6 +195,7 @@ class TC(object):
         ip = 0
         udp = 0
         tcp = 0
+        icmp = 0
         #*** Read into dpkt:
         eth = dpkt.ethernet.Ethernet(pkt)
         #*** Set local variables for efficient access, speed is critical...
@@ -182,20 +203,22 @@ class TC(object):
         eth_dst = mac_addr(eth.dst)
         eth_type = eth.type
 
-        if eth_type == 2048:
+        if eth_type == _ETH_TYPE_IP:
             ip = eth.data
             ip_src = socket.inet_ntop(socket.AF_INET, ip.src)
             ip_dst = socket.inet_ntop(socket.AF_INET, ip.dst)
-            #*** Check if UDP or TCP:
-            if ip.p == 6:
+            # Check if TCP, UDP or ICMP
+            if ip.p == _IP_PROTO_TCP:
                 tcp = ip.data
                 tcp_src = tcp.sport
                 tcp_dst = tcp.dport
 
-            elif ip.p == 17:
+            elif ip.p == _IP_PROTO_UDP:
                 udp = ip.data
                 udp_src = udp.sport
                 udp_dst = udp.dport
+            elif ip.p == _IP_PROTO_ICMP:
+                icmp = ip.id
 
         #*** Check for Identity Indicators:
         if udp:
@@ -212,23 +235,33 @@ class TC(object):
                 #*** DNS (TCP):
                 return self._parse_dns(tcp.data, eth_src)
 
-        if eth_type == 35020:
+        if eth_type == _ETH_TYPE_LLDP:
             #*** LLDP:
             return self._parse_lldp(pkt, eth_src)
 
-        if eth_type == 2054:
+        if eth_type == _ETH_TYPE_ARP:
             #*** ARP:
             return self._parse_arp(eth, eth_src)
 
-        #*** The following is TCP specific but shouldn't be... TBD...
-        if tcp:
-            #*** Read packet into flow object for classifiers to work with:
-            self.flow.ingest_packet(pkt, pkt_receive_timestamp)
+        # The following only handles TCP, UDP and ICMP
+        if tcp or udp or icmp:
+            # Read the packet into the correct flow object and store
+            # for classifiers.
+            if tcp:
+                self.tcp_flow.ingest_packet(pkt, pkt_receive_timestamp)
+                flow_type = self.tcp_flow
+            elif udp:
+                self.udp_flow.ingest_packet(pkt, pkt_receive_timestamp)
+                flow_type = self.udp_flow
+            else:
+                # The packet is ICMP
+                self.icmp_flow.ingest_packet(pkt, pkt_receive_timestamp)
+                flow_type = self.icmp_flow
 
-            #*** Run any custom classifiers:
+             #*** Run any custom classifiers:
             for classifier in self.classifiers:
                 try:
-                    result_classifier = classifier.classifier(self.flow)
+                    result_classifier = classifier.classifier(flow_type)
                 except:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     self.logger.error("Exception in custom classifier %s."
@@ -244,23 +277,23 @@ class TC(object):
 
         #*** Suppress Elephant flows:
         #***  TBD, do on more than just IPv4 TCP...:
-        if tcp and self.flow.packet_count >= \
+        if tcp and self.tcp_flow.packet_count >= \
                                 self.suppress_flow_pkt_count_initial:
             self.logger.debug("Flow is candidate for suppression src_ip=%s "
                                     "src_port=%s dst_ip=%s dst_port=%s",
-                                    self.flow.ip_src, self.flow.tcp_src,
-                                    self.flow.ip_dst, self.flow.tcp_dst)
+                              self.tcp_flow.ip_src, self.tcp_flow.tcp_src,
+                              self.tcp_flow.ip_dst, self.tcp_flow.tcp_dst)
             #*** Only suppress if there's been sufficient backoff since
             #***  any previous suppressions to prevent overload of ctrlr
-            if not self.flow.suppressed or (self.flow.packet_count > \
-                            (self.flow.suppressed + \
+            if not self.tcp_flow.suppressed or (self.tcp_flow.packet_count > \
+                            (self.tcp_flow.suppressed + \
                             self.suppress_flow_pkt_count_backoff)):
                 #*** Update the suppress counter on the flow:
-                self.flow.set_suppress_flow()
+                self.tcp_flow.set_suppress_flow()
                 self.logger.debug("Suppressing TCP stream src_ip=%s "
                                     "src_port=%s dst_ip=%s dst_port=%s",
-                                    self.flow.ip_src, self.flow.tcp_src,
-                                    self.flow.ip_dst, self.flow.tcp_dst)
+                                  self.tcp_flow.ip_src, self.tcp_flow.tcp_src,
+                                  self.tcp_flow.ip_dst, self.tcp_flow.tcp_dst)
                 if result['type'] == 'none':
                     result['type'] = 'suppress'
                 elif result['type'] == 'treatment':
@@ -270,19 +303,34 @@ class TC(object):
             else:
                 self.logger.debug("Deferring suppression TCP stream src_ip=%s "
                                     "src_port=%s dst_ip=%s dst_port=%s",
-                                    self.flow.ip_src, self.flow.tcp_src,
-                                    self.flow.ip_dst, self.flow.tcp_dst)
+                                  self.tcp_flow.ip_src, self.tcp_flow.tcp_src,
+                                  self.tcp_flow.ip_dst, self.tcp_flow.tcp_dst)
                 self.logger.debug("    self.flow.suppressed=%s",
-                                        self.flow.suppressed)
+                                  self.tcp_flow.suppressed)
 
         if result['type'] != 'none':
             #*** Add context to result:
-            result['ip_A'] = self.flow.ip_src
-            result['ip_B'] = self.flow.ip_dst
-            result['proto'] = 'tcp'
-            result['tp_A'] = self.flow.tcp_src
-            result['tp_B'] = self.flow.tcp_dst
-            result['flow_packets'] = self.flow.packet_count
+            if tcp:
+                result['ip_A'] = self.tcp_flow.ip_src
+                result['ip_B'] = self.tcp_flow.ip_dst
+                result['proto'] = 'tcp'
+                result['tp_A'] = self.tcp_flow.tcp_src
+                result['tp_B'] = self.tcp_flow.tcp_dst
+                result['flow_packets'] = self.tcp_flow.packet_count
+            elif udp:
+                result['ip_A'] = self.udp_flow.ip_src
+                result['ip_B'] = self.udp_flow.ip_dst
+                result['proto'] = 'udp'
+                result['tp_A'] = self.udp_flow.udp_src
+                result['tp_B'] = self.udp_flow.udp_dst
+                result['flow_packets'] = self.udp_flow.packet_count
+            elif icmp:
+                result['ip_A'] = self.icmp_flow.ip_src
+                result['ip_B'] = self.icmp_flow.ip_dst
+                result['proto'] = 'icmp'
+                result['tp_A'] = "N/A"
+                result['tp_B'] = "N/A"
+                result['flow_packets'] = self.icmp_flow.packet_count
 
         return result
 
@@ -436,6 +484,7 @@ class TC(object):
             lldpPayload = lldpPayload[2 + tlv_len:]
 
         return (system_name, port_id)
+
 
 def mac_addr(address):
     """
