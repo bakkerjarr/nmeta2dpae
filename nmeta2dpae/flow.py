@@ -50,44 +50,97 @@ class Flow(object):
     Variables available for Classifiers (assumes class instantiated as
     an object called 'flow'):
 
-        # Variables for the current packet:
-        flow.ip_src         # IP source address of latest packet in flow
-        flow.ip_dst         # IP dest address of latest packet in flow
-        flow.tcp_src        # TCP source port of latest packet in flow
-        flow.tcp_dst        # TCP dest port of latest packet in flow
-        flow.tcp_seq        # TCP sequence number of latest packet in flow
-        flow.tcp_acq        # TCP acknowledgement number of latest
-                            #  packet in flow
+        **Variables for the current packet**:
 
-        flow.tcp_fin()      # True if TCP FIN flag is set in the current packet
-        flow.tcp_syn()      # True if TCP SYN flag is set in the current packet
-        flow.tcp_rst()      # True if TCP RST flag is set in the current packet
-        flow.tcp_psh()      # True if TCP PSH flag is set in the current packet
-        flow.tcp_ack()      # True if TCP ACK flag is set in the current packet
-        flow.tcp_urg()      # True if TCP URG flag is set in the current packet
-        flow.tcp_ece()      # True if TCP ECE flag is set in the current packet
-        flow.tcp_cwr()      # True if TCP CWR flag is set in the current packet
-        flow.payload        # Payload of TCP of latest packet in flow
-        flow.packet_length  # Length in bytes of the current packet on wire
-        flow.packet_direction   # c2s (client to server), s2c or unknown
+        flow.ip_src
+          IP source address of latest packet in flow
 
-        # Variables for the whole flow:
-        flow.finalised      # A classification has been made
-        flow.suppressed     # The flow packet count number when
-                            #  a request was made to controller to not see
-                            #  further packets in this flow. 0 is
-                            #  not suppressed
-        flow.packet_count   # Unique packets registered for the flow
-        flow.client         # The IP that is the originator of the TCP
-                            #  session (if known, otherwise 0)
-        flow.server         # The IP that is the destination of the TCP session
-                            #  session (if known, otherwise 0)
+        flow.ip_dst
+          IP dest address of latest packet in flow
 
-    Methods available for Classifiers (assumes class instantiated as
-    an object called 'flow'):
-        flow.max_packet_size()           # Size of largest packet in the flow
-        flow.max_interpacket_interval()  # TBD
-        flow.min_interpacket_interval()  # TBD
+        flow.tcp_src
+          TCP source port of latest packet in flow
+
+        flow.tcp_dst
+          TCP dest port of latest packet in flow
+
+        flow.tcp_seq
+          TCP sequence number of latest packet in flow
+
+        flow.tcp_acq
+          TCP acknowledgement number of latest packet in flow
+
+        flow.tcp_fin()
+          True if TCP FIN flag is set in the current packet
+
+        flow.tcp_syn()
+          True if TCP SYN flag is set in the current packet
+
+        flow.tcp_rst()
+          True if TCP RST flag is set in the current packet
+
+        flow.tcp_psh()
+          True if TCP PSH flag is set in the current packet
+
+        flow.tcp_ack()
+          True if TCP ACK flag is set in the current packet
+
+        flow.tcp_urg()
+          True if TCP URG flag is set in the current packet
+
+        flow.tcp_ece()
+          True if TCP ECE flag is set in the current packet
+
+        flow.tcp_cwr()
+          True if TCP CWR flag is set in the current packet
+
+        flow.payload
+          Payload of TCP of latest packet in flow
+
+        flow.packet_length
+          Length in bytes of the current packet on wire
+
+        flow.packet_direction
+          c2s (client to server) or s2c directionality based on first observed
+          packet having SYN or SYN+ACK flag, otherwise client assumed as source
+          IP of first packet and verified_direction set to 0 (i.e. 
+          don't trust packet_direction unless verified_direction is set)
+
+        **Variables for the whole flow**:
+
+        flow.verified_direction
+          Describes how the directionality of the flow was ascertained.
+          Values can be verified-SYN, verified-SYNACK or 0 (unverified)
+
+        flow.finalised
+          A classification has been made
+
+        flow.suppressed
+          The flow packet count number when a request was made to controller
+          to not see further packets in this flow. 0 is not suppressed
+
+        flow.packet_count
+          Unique packets registered for the flow
+
+        flow.client
+          The IP that is the originator of the TCP session (if known,
+          otherwise 0)
+
+        flow.server
+          The IP that is the destination of the TCP session
+          session (if known, otherwise 0)
+
+        **Methods available for Classifiers**:
+        (assumes class instantiated as an object called 'flow')
+
+        flow.max_packet_size()
+          Size of largest packet in the flow
+
+        flow.max_interpacket_interval()
+          TBD
+
+        flow.min_interpacket_interval()
+          TBD
 
     Challenges:
      - duplicate packets
@@ -126,6 +179,7 @@ class Flow(object):
         self.client = 0
         self.server = 0
         self.packet_direction = 'unknown'
+        self.verified_direction = 0
         self.suppressed = 0
 
         #*** Start mongodb:
@@ -188,11 +242,26 @@ class Flow(object):
             #*** Get flow direction (which way is TCP initiated). Client is
             #***  the end that sends the initial TCP SYN:
             if _is_tcp_syn(tcp.flags):
-                self.logger.debug("Matched TCP SYN, src_ip=%s", self.ip_src)
+                self.logger.debug("Matched TCP SYN first pkt, src_ip=%s",
+                                                                self.ip_src)
                 self.client = self.ip_src
                 self.server = self.ip_dst
                 self.packet_direction = 'c2s'
-
+                self.verified_direction = 'verified-SYN'
+            elif _is_tcp_synack(tcp.flags):
+                self.logger.debug("Matched TCP SYN+ACK first pkt, src_ip=%s",
+                                                                self.ip_src)
+                self.client = self.ip_dst
+                self.server = self.ip_src
+                self.packet_direction = 's2c'
+                self.verified_direction = 'verified-SYNACK'
+            else:
+                self.logger.debug("Unmatch state first pkt, tcp_flags=%s",
+                                                                tcp.flags)
+                self.client = self.ip_src
+                self.server = self.ip_dst
+                self.packet_direction = 'c2s'
+                self.verified_direction = 0
             #*** Neither direction found, so add to FCIP database:
             self.fcip_doc = {'hash': self.fcip_hash,
                         'ip_A': self.ip_src,
@@ -207,7 +276,8 @@ class Flow(object):
                         'packet_lengths': [self.packet_length,],
                         'client': self.client,
                         'server': self.server,
-                        'packet_directions': ['c2s',],
+                        'packet_directions': [self.packet_direction,],
+                        'verified_direction': self.verified_direction,
                         'suppressed': 0}
             self.logger.debug("FCIP: Adding record for %s to DB",
                                                 self.fcip_doc)
@@ -241,6 +311,8 @@ class Flow(object):
                 self.logger.debug("Finalising...")
             #*** Read suppressed status to variable:
             self.suppressed = self.fcip_doc['suppressed']
+            #*** Read verified_direction status to variable:
+            self.verified_direction = self.fcip_doc['verified_direction']
             #*** Add packet timestamps, tcp flags etc:
             self.fcip_doc['packet_timestamps'].append(pkt_receive_timestamp)
             self.fcip_doc['tcp_flags'].append(tcp.flags)
@@ -417,10 +489,20 @@ class Flow(object):
 
 def _is_tcp_syn(tcp_flags):
     """
-    Passed a TCP flags object and return 1 if it
+    Passed a TCP flags object (hex) and return 1 if it
     contains a TCP SYN and no other flags
     """
     if tcp_flags == 2:
+        return 1
+    else:
+        return 0
+
+def _is_tcp_synack(tcp_flags):
+    """
+    Passed a TCP flags object (hex) and return 1 if it
+    contains TCP SYN + ACK flags and no other flags
+    """
+    if tcp_flags == 0x12:
         return 1
     else:
         return 0
