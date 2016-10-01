@@ -1,2 +1,4 @@
 .idea
 *.pyc
+test/__pycache__/
+docs/build

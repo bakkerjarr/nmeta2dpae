@@ -39,7 +39,14 @@ from pymongo import MongoClient
 # of referencing to modules.
 _ETH_TYPE_IP = dpkt.ethernet.ETH_TYPE_IP
 _IP_PROTO_TCP = dpkt.ip.IP_PROTO_TCP
-
+_TH_FIN = dpkt.tcp.TH_FIN
+_TH_SYN = dpkt.tcp.TH_SYN
+_TH_RST = dpkt.tcp.TH_RST
+_TH_PUSH = dpkt.tcp.TH_PUSH
+_TH_ACK = dpkt.tcp.TH_ACK
+_TH_URG = dpkt.tcp.TH_URG
+_TH_ECE = dpkt.tcp.TH_ECE
+_TH_CWR = dpkt.tcp.TH_CWR
 
 class TCPFlow(flow.Flow):
     """
@@ -56,44 +63,98 @@ class TCPFlow(flow.Flow):
     Variables available for Classifiers (assumes class instantiated as
     an object called 'flow'):
 
-        # Variables for the current packet:
-        tcp.ip_src         # IP source address of latest packet in flow
-        tcp.ip_dst         # IP dest address of latest packet in flow
-        tcp.tcp_src        # TCP source port of latest packet in flow
-        tcp.tcp_dst        # TCP dest port of latest packet in flow
-        tcp.tcp_seq        # TCP sequence number of latest packet in flow
-        tcp.tcp_acq        # TCP acknowledgement number of latest
-                            #  packet in flow
 
-        tcp.tcp_fin()      # True if TCP FIN flag is set in the current packet
-        tcp.tcp_syn()      # True if TCP SYN flag is set in the current packet
-        tcp.tcp_rst()      # True if TCP RST flag is set in the current packet
-        tcp.tcp_psh()      # True if TCP PSH flag is set in the current packet
-        tcp.tcp_ack()      # True if TCP ACK flag is set in the current packet
-        tcp.tcp_urg()      # True if TCP URG flag is set in the current packet
-        tcp.tcp_ece()      # True if TCP ECE flag is set in the current packet
-        tcp.tcp_cwr()      # True if TCP CWR flag is set in the current packet
-        tcp.payload        # Payload of TCP of latest packet in flow
-        tcp.packet_length  # Length in bytes of the current packet on wire
-        tcp.packet_direction   # c2s (client to server), s2c or unknown
+        **Variables for the current packet**:
 
-        # Variables for the whole flow:
-        tcp.finalised      # A classification has been made
-        tcp.suppressed     # The flow packet count number when
-                            #  a request was made to controller to not see
-                            #  further packets in this flow. 0 is
-                            #  not suppressed
-        tcp.packet_count   # Unique packets registered for the flow
-        tcp.client         # The IP that is the originator of the TCP
-                            #  session (if known, otherwise 0)
-        tcp.server         # The IP that is the destination of the TCP
-                            # session (if known, otherwise 0)
+        tcp.ip_src
+          IP source address of latest packet in flow
 
-    Methods available for Classifiers (assumes class instantiated as
-    an object called 'flow'):
-        tcp.max_packet_size()           # Size of largest packet in the flow
-        tcp.max_interpacket_interval()  # TBD
-        tcp.min_interpacket_interval()  # TBD
+        tcp.ip_dst
+          IP dest address of latest packet in flow
+
+        tcp.tcp_src
+          TCP source port of latest packet in flow
+
+        tcp.tcp_dst
+          TCP dest port of latest packet in flow
+
+        tcptcp_seq
+          TCP sequence number of latest packet in flow
+
+        tcp.tcp_acq
+          TCP acknowledgement number of latest packet in flow
+
+        ftcp.tcp_fin()
+          True if TCP FIN flag is set in the current packet
+
+        tcp.tcp_syn()
+          True if TCP SYN flag is set in the current packet
+
+        tcp.tcp_rst()
+          True if TCP RST flag is set in the current packet
+
+        tcp.tcp_psh()
+          True if TCP PSH flag is set in the current packet
+
+        tcp.tcp_ack()
+          True if TCP ACK flag is set in the current packet
+
+        tcp.tcp_urg()
+          True if TCP URG flag is set in the current packet
+
+        tcp.tcp_ece()
+          True if TCP ECE flag is set in the current packet
+
+        tcp.tcp_cwr()
+          True if TCP CWR flag is set in the current packet
+
+        tcp.payload
+          Payload of TCP of latest packet in flow
+
+        tcp.packet_length
+          Length in bytes of the current packet on wire
+
+        tcp.packet_direction
+          c2s (client to server) or s2c directionality based on first observed
+          packet having SYN or SYN+ACK flag, otherwise client assumed as source
+          IP of first packet and verified_direction set to 0 (i.e. 
+          don't trust packet_direction unless verified_direction is set)
+
+        **Variables for the whole flow**:
+
+        tcp.verified_direction
+          Describes how the directionality of the flow was ascertained.
+          Values can be verified-SYN, verified-SYNACK or 0 (unverified)
+
+        tcp.finalised
+          A classification has been made
+
+        tcp.suppressed
+          The flow packet count number when a request was made to controller
+          to not see further packets in this flow. 0 is not suppressed
+
+        tcp.packet_count
+          Unique packets registered for the flow
+
+        tcp.client
+          The IP that is the originator of the TCP session (if known,
+          otherwise 0)
+
+        tcp.server
+          The IP that is the destination of the TCP session
+          session (if known, otherwise 0)
+
+        **Methods available for Classifiers**:
+        (assumes class instantiated as an object called 'flow')
+
+        tcp.max_packet_size()
+          Size of largest packet in the flow
+
+        tcp.max_interpacket_interval()
+          TBD
+
+        tcp.min_interpacket_interval()
+          TBD
 
     Challenges:
      - duplicate packets
@@ -120,6 +181,9 @@ class TCPFlow(flow.Flow):
         self.tcp_flags = 0
         self.tcp_seq = 0
         self.tcp_acq = 0
+
+        #*** Initialise flow variables:
+        self.verified_direction = 0
 
         #*** Start mongodb:
         self.logger.info("Connecting to mongodb database...")
@@ -182,11 +246,26 @@ class TCPFlow(flow.Flow):
             #*** Get flow direction (which way is TCP initiated). Client is
             #***  the end that sends the initial TCP SYN:
             if _is_tcp_syn(tcp.flags):
-                self.logger.debug("Matched TCP SYN, src_ip=%s", self.ip_src)
+                self.logger.debug("Matched TCP SYN first pkt, src_ip=%s",
+                                                                self.ip_src)
                 self.client = self.ip_src
                 self.server = self.ip_dst
                 self.packet_direction = 'c2s'
-
+                self.verified_direction = 'verified-SYN'
+            elif _is_tcp_synack(tcp.flags):
+                self.logger.debug("Matched TCP SYN+ACK first pkt, src_ip=%s",
+                                                                self.ip_src)
+                self.client = self.ip_dst
+                self.server = self.ip_src
+                self.packet_direction = 's2c'
+                self.verified_direction = 'verified-SYNACK'
+            else:
+                self.logger.debug("Unmatch state first pkt, tcp_flags=%s",
+                                                                tcp.flags)
+                self.client = self.ip_src
+                self.server = self.ip_dst
+                self.packet_direction = 'c2s'
+                self.verified_direction = 0
             #*** Neither direction found, so add to FCIP database:
             self.fcip_doc = {'hash': self.fcip_hash,
                         'ip_A': self.ip_src,
@@ -206,7 +285,8 @@ class TCPFlow(flow.Flow):
                         'tcp_flags': [tcp.flags,],
                         'client': self.client,
                         'server': self.server,
-                        'packet_directions': ['c2s',],
+                        'packet_directions': [self.packet_direction,],
+                        'verified_direction': self.verified_direction,
                         'suppressed': 0}
             self.logger.debug("FCIP: Adding record for %s to DB",
                                                 self.fcip_doc)
@@ -263,7 +343,9 @@ class TCPFlow(flow.Flow):
                 self.logger.debug("Finalising...")
             #*** Read suppressed status to variable:
             self.suppressed = self.fcip_doc['suppressed']
-            # Add packet timestamps and other packet context
+            #*** Read verified_direction status to variable:
+            self.verified_direction = self.fcip_doc['verified_direction']
+            #*** Add packet timestamps, tcp flags etc:
             self.fcip_doc['packet_timestamps'].append(pkt_receive_timestamp)
             self.fcip_doc['latest_timestamp'] = pkt_receive_timestamp
             self.fcip_doc['tcp_flags'].append(tcp.flags)
@@ -305,58 +387,69 @@ class TCPFlow(flow.Flow):
         """
         Does the current packet have the TCP FIN flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_FIN != 0
+        return self.tcp_flags & _TH_FIN != 0
 
     def tcp_syn(self):
         """
         Does the current packet have the TCP SYN flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_SYN != 0
+        return self.tcp_flags & _TH_SYN != 0
 
     def tcp_rst(self):
         """
         Does the current packet have the TCP RST flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_RST != 0
+        return self.tcp_flags & _TH_RST != 0
 
     def tcp_psh(self):
         """
         Does the current packet have the TCP PSH flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_PUSH != 0
+        return self.tcp_flags & _TH_PUSH != 0
 
     def tcp_ack(self):
         """
         Does the current packet have the TCP ACK flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_ACK != 0
+        return self.tcp_flags & _TH_ACK != 0
 
     def tcp_urg(self):
         """
         Does the current packet have the TCP URG flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_URG != 0
+        return self.tcp_flags & _TH_URG != 0
 
     def tcp_ece(self):
         """
         Does the current packet have the TCP ECE flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_ECE != 0
+        return self.tcp_flags & _TH_ECE != 0
 
     def tcp_cwr(self):
         """
         Does the current packet have the TCP CWR flag set?
         """
-        return self.tcp_flags & dpkt.tcp.TH_CWR != 0
+        return self.tcp_flags & _TH_CWR != 0
 
 #================== PRIVATE FUNCTIONS ==================
 
 def _is_tcp_syn(tcp_flags):
     """
-    Passed a TCP flags object and return 1 if it
+    Passed a TCP flags object (hex) and return 1 if it
     contains a TCP SYN and no other flags
     """
     if tcp_flags == 2:
+        return 1
+    else:
+        return 0
+
+
+def _is_tcp_synack(tcp_flags):
+    """
+    Passed a TCP flags object (hex) and return 1 if it
+    contains TCP SYN + ACK flags and no other flags
+    """
+    if tcp_flags == 0x12:
         return 1
     else:
         return 0
