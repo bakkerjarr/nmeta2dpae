@@ -42,6 +42,9 @@ from flow import icmp_flow
 from flow import tcp_flow
 from flow import udp_flow
 
+# For mining stored flow data
+from data_miner import DataMiner
+
 #*** For importing custom classifiers:
 import importlib
 
@@ -127,13 +130,18 @@ class TC(object):
         #*** Retrieve config values for flow class db connection to use:
         _mongo_addr = _config.get_value("mongo_addr")
         _mongo_port = _config.get_value("mongo_port")
-        # Instantiate flow objecta for classifiers to work with:
+
+        # Instantiate flow objects for classifiers to work with:
         self.icmp_flow = icmp_flow.ICMPFlow(self.logger, _mongo_addr,
                                             _mongo_port)
         self.tcp_flow = tcp_flow.TCPFlow(self.logger, _mongo_addr,
                                          _mongo_port)
         self.udp_flow = udp_flow.UDPFlow(self.logger, _mongo_addr,
                                          _mongo_port)
+
+        # Instantiate a DataMiner object for classifiers to mine
+        # database information with.
+        self._data_miner = DataMiner(_config)
 
     def instantiate_classifiers(self, _classifiers):
         """
