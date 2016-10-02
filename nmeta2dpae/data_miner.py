@@ -115,7 +115,7 @@ class DataMiner(object):
 
         :param req: A request for data matching the DATA_REQ_TEMPLATE
         format.
-        :return: The requested data as a dict.
+        :return: The requested data as a dict, 0 if an error occurred.
         """
         pass
 
