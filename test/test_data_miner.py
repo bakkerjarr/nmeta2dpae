@@ -62,20 +62,25 @@ def test_data_miner():
         Expand 'Frame' in the middle pane,
         right-click 'Epoch Time' Copy -> Value
     """
-    # Install TCP flows into fcip_tcp
+    # Install flows into FCIP database collections
     _install_tcp_flows()
+    _install_icmp_flows()
 
     # Create DataMiner object
     data_miner = DataMiner(_config)
 
-    # Test!
-    _test_mine_bad_req_tcp(data_miner)
-    _test_mine_unsupported_req_tcp(data_miner)
+    # Unit tests for DataMiner requests
+    _test_mine_bad_req(data_miner)
+    _test_mine_unsupported_req(data_miner)
+    # Unit tests for mining ICMP flow data
+    _test_mine_missing_icmp(data_miner)
+    _test_mine_success_icmp(data_miner)
+    # Unit tests for mining TCP flow data
     _test_mine_missing_tcp(data_miner)
     _test_mine_success_tcp(data_miner)
 
 
-def _test_mine_bad_req_tcp(data_miner):
+def _test_mine_bad_req(data_miner):
     """Test that a DataMiner object gracefully handles improperly
     formatted requests.
 
@@ -139,7 +144,7 @@ def _test_mine_bad_req_tcp(data_miner):
     assert data_miner.mine_raw_data(req) == 0
 
 
-def _test_mine_unsupported_req_tcp(data_miner):
+def _test_mine_unsupported_req(data_miner):
     """Test that a DataMiner object gracefully handled improperly
     unsupported requests.
 
@@ -186,9 +191,50 @@ def _test_mine_unsupported_req_tcp(data_miner):
     assert data_miner.mine_raw_data(req) == 0
 
 
-def _test_mine_missing_tcp(data_miner):
-    """Test that a DataMiner object can handle fetching flow
+def _test_mine_missing_icmp(data_miner):
+    """Test that a DataMiner object can handle fetching ICMP flow
     information that does not exist..
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    req = {"proto": "icmp",
+           "match": {"hash": "f33bcbe242c5190837aa87848f254a7f"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"]}
+
+    dm_result = data_miner.mine_raw_data(req)
+    assert type(dm_result) is dict
+    assert len(dm_result) == 0
+
+
+def _test_mine_success_icmp(data_miner):
+    """Test that ICMP flow information can be successfully fetched.
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    req = {"proto": "icmp",
+           "match": {"hash": "f33bcbe242c5190837aa87848f254a12"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"]}
+    exp_tcp_result = {"total_pkt_len_A": 294, "total_pkt_len_B": 294,
+                      "total_pkt_cnt_A": 3, "total_pkt_cnt_B": 3,
+                      "latest_timestamp": 1475531008.074029,
+                      "packet_timestamps": [1475531006.075766,
+                                            1475531006.0759618,
+                                            1475531007.074772,
+                                            1475531007.0750225,
+                                            1475531008.0737746,
+                                            1475531008.074029]}
+    dm_result = data_miner.mine_raw_data(req)
+    assert type(dm_result) is dict
+    assert cmp(exp_tcp_result, dm_result) == 0
+
+
+def _test_mine_missing_tcp(data_miner):
+    """Test that a DataMiner object can handle fetching TCP flow
+    information that does not exist.
 
     :param data_miner: DataMiner object to mine with.
     """
@@ -204,7 +250,7 @@ def _test_mine_missing_tcp(data_miner):
 
 
 def _test_mine_success_tcp(data_miner):
-    """Test that information can be successfully fetched.
+    """Test that TCP flow information can be successfully fetched.
 
     :param data_miner: DataMiner object to mine with.
     """
@@ -226,6 +272,125 @@ def _test_mine_success_tcp(data_miner):
     dm_result = data_miner.mine_raw_data(req)
     assert type(dm_result) is dict
     assert cmp(exp_tcp_result, dm_result) == 0
+
+
+def _install_icmp_flows():
+    """Insert some ICMP flows into the fcip_icmp collection and check
+    their validity.
+    """
+    #*** Flow 1 ECHO request 1
+    # 1	0.000000000	172.16.0.10	172.16.0.101	ICMP	98	Echo (ping) request  id=0x0d3a, seq=1/256, ttl=64 (reply in 2)
+    flow1_pkt1 = binascii.unhexlify("0800278801300800278a923b080045000054c012400040012207ac10000aac10006508004ca10d3a0001fed0f25700000000ed27010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637")
+    flow1_pkt1_timestamp = 1475531006.075766189
+
+    #*** Flow 1 ECHO reply 1
+    # 2	0.000195755	172.16.0.101	172.16.0.10	ICMP	98	Echo (ping) reply    id=0x0d3a, seq=1/256, ttl=64 (request in 1)
+    flow1_pkt2 = binascii.unhexlify("0800278a923b080027880130080045000054f8320000400129e7ac100065ac10000a000054a10d3a0001fed0f25700000000ed27010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637")
+    flow1_pkt2_timestamp = 1475531006.075961944
+
+    #*** Flow 1 ECHO request 2
+    # 3	0.999005806	172.16.0.10	172.16.0.101	ICMP	98	Echo (ping) request  id=0x0d3a, seq=2/512, ttl=64 (reply in 4)
+    flow1_pkt3 = binascii.unhexlify("0800278801300800278a923b080045000054c102400040012117ac10000aac100065080032a40d3a0002ffd0f257000000000624010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637")
+    flow1_pkt3_timestamp = 1475531007.074771995
+
+    #*** Flow 1 ECHO reply 2
+    # 4	0.999256251	172.16.0.101	172.16.0.10	ICMP	98	Echo (ping) reply    id=0x0d3a, seq=2/512, ttl=64 (request in 3)
+    flow1_pkt4 = binascii.unhexlify("0800278a923b080027880130080045000054f86a0000400129afac100065ac10000a00003aa40d3a0002ffd0f257000000000624010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637")
+    flow1_pkt4_timestamp = 1475531007.075022440
+
+    #*** Flow 1 ECHO request 3
+    # 5	1.998008329	172.16.0.10	172.16.0.101	ICMP	98	Echo (ping) request  id=0x0d3a, seq=3/768, ttl=64 (reply in 6)
+    flow1_pkt5 = binascii.unhexlify("0800278801300800278a923b080045000054c16b4000400120aeac10000aac100065080017a70d3a000300d1f257000000002020010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637")
+    flow1_pkt5_timestamp = 1475531008.073774518
+
+    #*** Flow 1 ECHO reply 3
+    # 6	1.998262748	172.16.0.101	172.16.0.10	ICMP	98	Echo (ping) reply    id=0x0d3a, seq=3/768, ttl=64 (request in 5)
+    flow1_pkt6 = binascii.unhexlify("0800278a923b080027880130080045000054f905000040012914ac100065ac10000a00001fa70d3a000300d1f257000000002020010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637")
+    flow1_pkt6_timestamp = 1475531008.074028937
+
+    #*** Packet lengths for flow 1 on the wire (null value for index 0):
+    pkt_len = [0, 98, 98, 98, 98, 98, 98]
+
+    #*** Sanity check can read into dpkt:
+    eth = dpkt.ethernet.Ethernet(flow1_pkt1)
+    eth_src = _mac_addr(eth.src)
+    assert eth_src == '08:00:27:8a:92:3b'
+
+    #*** Instantiate a flow object:
+    flow = icmp_flow.ICMPFlow(logger, _mongo_addr, _mongo_port)
+
+    #*** Test Flow 1 Packet 1:
+    flow.ingest_packet(flow1_pkt1, flow1_pkt1_timestamp)
+    assert flow.packet_count == 1
+    assert flow.packet_length == pkt_len[1]
+    assert flow.ip_src == "172.16.0.10"
+    assert flow.ip_dst == "172.16.0.101"
+    assert flow.client == "172.16.0.10"
+    assert flow.server == "172.16.0.101"
+    assert flow.icmp_type == 8
+    assert flow.icmp_code == 0
+    assert flow.packet_direction == 'c2s'
+
+    #*** Test Flow 1 Packet 2:
+    flow.ingest_packet(flow1_pkt2, flow1_pkt2_timestamp)
+    assert flow.packet_count == 2
+    assert flow.packet_length == pkt_len[2]
+    assert flow.ip_src == "172.16.0.101"
+    assert flow.ip_dst == "172.16.0.10"
+    assert flow.client == "172.16.0.10"
+    assert flow.server == "172.16.0.101"
+    assert flow.icmp_type == 0
+    assert flow.icmp_code == 0
+    assert flow.packet_direction == 's2c'
+
+    #*** Test Flow 1 Packet 3:
+    flow.ingest_packet(flow1_pkt3, flow1_pkt3_timestamp)
+    assert flow.packet_count == 3
+    assert flow.packet_length == pkt_len[3]
+    assert flow.ip_src == "172.16.0.10"
+    assert flow.ip_dst == "172.16.0.101"
+    assert flow.client == "172.16.0.10"
+    assert flow.server == "172.16.0.101"
+    assert flow.icmp_type == 8
+    assert flow.icmp_code == 0
+    assert flow.packet_direction == 'c2s'
+
+    #*** Test Flow 1 Packet 4:
+    flow.ingest_packet(flow1_pkt4, flow1_pkt4_timestamp)
+    assert flow.packet_count == 4
+    assert flow.packet_length == pkt_len[4]
+    assert flow.ip_src == "172.16.0.101"
+    assert flow.ip_dst == "172.16.0.10"
+    assert flow.client == "172.16.0.10"
+    assert flow.server == "172.16.0.101"
+    assert flow.icmp_type == 0
+    assert flow.icmp_code == 0
+    assert flow.packet_direction == 's2c'
+
+    #*** Test Flow 1 Packet 5:
+    flow.ingest_packet(flow1_pkt5, flow1_pkt5_timestamp)
+    assert flow.packet_count == 5
+    assert flow.packet_length == pkt_len[5]
+    assert flow.ip_src == "172.16.0.10"
+    assert flow.ip_dst == "172.16.0.101"
+    assert flow.client == "172.16.0.10"
+    assert flow.server == "172.16.0.101"
+    assert flow.icmp_type == 8
+    assert flow.icmp_code == 0
+    assert flow.packet_direction == 'c2s'
+
+    #*** Test Flow 1 Packet 6:
+    flow.ingest_packet(flow1_pkt6, flow1_pkt6_timestamp)
+    assert flow.packet_count == 6
+    assert flow.packet_length == pkt_len[6]
+    assert flow.ip_src == "172.16.0.101"
+    assert flow.ip_dst == "172.16.0.10"
+    assert flow.client == "172.16.0.10"
+    assert flow.server == "172.16.0.101"
+    assert flow.icmp_type == 0
+    assert flow.icmp_code == 0
+    assert flow.packet_direction == 's2c'
+
 
 
 def _install_tcp_flows():
