@@ -71,6 +71,7 @@ def test_data_miner():
     # Test!
     _test_mine_bad_req_tcp(data_miner)
     _test_mine_unsupported_req_tcp(data_miner)
+    _test_mine_missing_tcp(data_miner)
     _test_mine_success_tcp(data_miner)
 
 
@@ -88,14 +89,14 @@ def _test_mine_bad_req_tcp(data_miner):
     assert data_miner.mine_raw_data(req) == 0
     # Requests with missing entries
     req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
-           "proto": ["tcp"]}
+           "proto": "tcp"}
     assert data_miner.mine_raw_data(req) == 0
     req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"]}
     assert data_miner.mine_raw_data(req) == 0
-    req = {"proto": ["tcp"], "features": ["total_pkt_len_A",
+    req = {"proto": "tcp", "features": ["total_pkt_len_A",
                                           "total_pkt_len_B",
                                           "total_pkt_cnt_A",
                                           "total_pkt_cnt_B",
@@ -107,40 +108,34 @@ def _test_mine_bad_req_tcp(data_miner):
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"],
-           "proto": ["tcp"], "another": "value!!"}
+           "proto": "tcp", "another": "value!!"}
     assert data_miner.mine_raw_data(req) == 0
     # Requests with entries that are not the required type.
     req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"],
-           "proto": []}  # The proto entry should not be empty
-    assert data_miner.mine_raw_data(req) == 0
-    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
-           "features": ["total_pkt_len_A", "total_pkt_len_B",
-                        "total_pkt_cnt_A", "total_pkt_cnt_B",
-                        "latest_timestamp", "packet_timestamps"],
-           "proto": "tcp"}  # The proto entry should be a list
+           "proto": 1}  # The proto entry should be a string
     assert data_miner.mine_raw_data(req) == 0
     req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
            "features": [],
-           "proto": ["tcp"]}  # The features entry should not be empty
+           "proto": "tcp"}  # The features entry should not be empty
     assert data_miner.mine_raw_data(req) == 0
     req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
            "features": "total_pkt_len_A",
-           "proto": ["tcp"]}  # The features entry should be a list
+           "proto": "tcp"}  # The features entry should be a list
     assert data_miner.mine_raw_data(req) == 0
     req = {"match": {},
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"],
-           "proto": ["tcp"]}  # The match entry should not be empty
+           "proto": "tcp"}  # The match entry should not be empty
     assert data_miner.mine_raw_data(req) == 0
     req = {"match": "This should fail!",
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"],
-           "proto": ["tcp"]}  # The features entry should be a dict
+           "proto": "tcp"}  # The features entry should be a dict
     assert data_miner.mine_raw_data(req) == 0
 
 
@@ -158,15 +153,7 @@ def _test_mine_unsupported_req_tcp(data_miner):
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"],
-           "proto": ["mptcp"]}
-    assert data_miner.mine_raw_data(req) == 0
-    # A request with an unsupported transport protocol amongst
-    # supported protocols: MPTCP
-    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
-           "features": ["total_pkt_len_A", "total_pkt_len_B",
-                        "total_pkt_cnt_A", "total_pkt_cnt_B",
-                        "latest_timestamp", "packet_timestamps"],
-           "proto": ["icmp", "mptcp", "tcp"]}
+           "proto": "mptcp"}
     assert data_miner.mine_raw_data(req) == 0
     # A request with unsupported match values
     req = {"match": {"ip_A": "10.1.0.1", "ip_B": "10.1.0.2",
@@ -174,7 +161,7 @@ def _test_mine_unsupported_req_tcp(data_miner):
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"],
-           "proto": ["tcp"]}
+           "proto": "tcp"}
     assert data_miner.mine_raw_data(req) == 0
     # A request with unsupported match values amongst supported match
     # values
@@ -184,19 +171,36 @@ def _test_mine_unsupported_req_tcp(data_miner):
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
                         "latest_timestamp", "packet_timestamps"],
-           "proto": ["tcp"]}
+           "proto": "tcp"}
     assert data_miner.mine_raw_data(req) == 0
     # A request with unsupported features
     req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
            "features": ["this_does_not_exist"],
-           "proto": ["tcp"]}
+           "proto": "tcp"}
     assert data_miner.mine_raw_data(req) == 0
     # A request with unsupported features amongst supported features
     req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
            "features": ["this_does_not_exist", "latest_timestamp",
                         "packet_timestamps"],
-           "proto": ["tcp"]}
+           "proto": "tcp"}
     assert data_miner.mine_raw_data(req) == 0
+
+
+def _test_mine_missing_tcp(data_miner):
+    """Test that a DataMiner object can handle fetching flow
+    information that does not exist..
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    req = {"proto": "tcp",
+           "match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3f5"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"]}
+
+    dm_result = data_miner.mine_raw_data(req)
+    assert type(dm_result) is dict
+    assert len(dm_result) == 0
 
 
 def _test_mine_success_tcp(data_miner):
@@ -204,7 +208,7 @@ def _test_mine_success_tcp(data_miner):
 
     :param data_miner: DataMiner object to mine with.
     """
-    req = {"proto": ["tcp"],
+    req = {"proto": "tcp",
            "match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
            "features": ["total_pkt_len_A", "total_pkt_len_B",
                         "total_pkt_cnt_A", "total_pkt_cnt_B",
