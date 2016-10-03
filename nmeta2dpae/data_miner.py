@@ -34,7 +34,7 @@ import coloredlogs
 # MongoDB
 from pymongo import MongoClient
 
-_DATA_REQ_TEMPLATE = {"proto": [],      # Transport protocols to fetch.
+_DATA_REQ_TEMPLATE = {"proto": "",      # Transport protocol to fetch.
                       "match": {},      # Key:value pairs describing
                                         # what flows should be selected,
                                         # only supports 'hash' value.
@@ -137,39 +137,78 @@ class DataMiner(object):
 
         :param req: A request for data matching the DATA_REQ_TEMPLATE
         format.
-        :return: The requested data as a dict, 0 if an error occurred.
+        :return: The requested data as a dict, an empty dict if no
+        data could be found, 0 if an error occurred.
         """
         if not self._check_bad_dm_req(req) or not \
                 self._check_unsupported_dm_req(req):
             return 0
-        return 0  # Function not complete!
+        data = {}
+        if "tcp" in req["proto"]:
+            data = self._fetch_tcp_flows(req["match"])
+            if len(data) < 1:
+                return {}
+        elif "udp" in req["proto"]:
+            data = self._fetch_udp_flows(req["match"])
+            if len(data) < 1:
+                return {}
+        elif "icmp" in req["proto"]:
+            data = self._fetch_icmp_flows(req["match"])
+            if len(data) < 1:
+                return {}
+        else:
+            # We should not reach this!
+            self.logger.critical("Unsupported protocol was missed by "
+                                 "preprocessing checks: %s",
+                                 req["proto"])
+            return 0
+        # TODO Clean up the data for its return to the caller by filtering by req["features"]
+        return 0  # We should not reach this!
 
     def _fetch_icmp_flows(self, match):
         """Fetch data from the fcip_icmp MongoDB collection.
 
         :param match: The traffic features for MongoDB to match on
         when finding data.
-        :return: Flow data as a dict.
+        :return: Flow data as a dict, an empty dict if no data could
+        be found.
         """
-        pass
+        db_data = {"hash": match["hash"]}
+        fcip_doc = self._fcip_icmp.find_one(db_data)
+        if not fcip_doc:
+            self.logger.debug("No flow data found for match: %s", match)
+            return {}  # No data was found, return an empty list.
+        return fcip_doc
 
     def _fetch_tcp_flows(self, match):
         """Fetch data from the fcip_tcp MongoDB collection.
 
         :param match: The traffic features for MongoDB to match on
         when finding data.
-        :return: Flow data as a dict.
+        :return: Flow data as a dict, an empty dict if no data could
+        be found.
         """
-        pass
+        db_data = {"hash": match["hash"]}
+        fcip_doc = self._fcip_tcp.find_one(db_data)
+        if not fcip_doc:
+            self.logger.debug("No flow data found for match: %s", match)
+            return {}  # No data was found, return an empty list.
+        return fcip_doc
 
     def _fetch_udp_flows(self, match):
         """Fetch data from the fcip_udp MongoDB collection.
 
         :param match: The traffic features for MongoDB to match on
         when finding data.
-        :return: Flow data as a dict.
+        :return: Flow data as a dict, an empty dict if no data could
+        be found.
         """
-        pass
+        db_data = {"hash": match["hash"]}
+        fcip_doc = self._fcip_udp.find_one(db_data)
+        if not fcip_doc:
+            self.logger.debug("No flow data found for match: %s", match)
+            return {}  # No data was found, return an empty list.
+        return fcip_doc
 
     def _check_bad_dm_req(self, req):
         """Check that a data mining request is formatted correctly.
@@ -185,10 +224,9 @@ class DataMiner(object):
                               "required keys. Supplied: %s", req)
             return False
         # Check that the values are formatted correctly
-        if type(req["proto"]) is not list or len(req["proto"]) < 1:
+        if type(req["proto"]) is not str:
             self.logger.error("Data request 'proto' should be a "
-                              "non-empty list. Supplied: %s",
-                              req["proto"])
+                              "string. Supplied: %s", type(req["proto"]))
             return False
         if type(req["features"]) is not list or len(req["features"]) < 1:
             self.logger.error("Data request 'features' should be a "
@@ -208,28 +246,28 @@ class DataMiner(object):
         :param req: Data mining request to check.
         :return: True if the request can be supported, False otherwise.
         """
-        # Create a lambda for checking values. This evaluates to True
-        # if it finds one item in check that isn't in template.
+        # Check that supported transport protocols were provided.
+        if req["proto"] not in _SUPPORTED_PROTO:
+            self.logger.error("Data requested for unsupported "
+                              "protocol in: %s. Expected either: %s.",
+                              req["proto"], ", ".join(_SUPPORTED_PROTO))
+            return False
+        # Create a lambda for checking collections of values. This
+        # evaluates to True if it finds one item in check that isn't
+        # in template.
         lam_check = lambda check, template: any(i not in template for
                                                 i in check)
-        # Check that supported transport protocols were provided.
-        if lam_check(req["proto"], _SUPPORTED_PROTO):
-            self.logger.error("Data requested for unsupported "
-                              "protocol in: %s. Expected from: %s.",
-                              ", ".join(req["proto"]), ", ".join(
-                                                       _SUPPORTED_PROTO))
-            return False
         # Check that supported features were provided.
         if lam_check(req["features"], _SUPPORTED_FEATURES):
             self.logger.error("Data requested for unsupported "
-                              "features in: %s. Expected from: %s.",
+                              "features in: %s. Expected either: %s.",
                               ", ".join(req["features"]), ", ".join(
                                                     _SUPPORTED_FEATURES))
             return False
         # Check that supported match items were provided.
         if lam_check(req["match"].keys(), _SUPPORTED_MATCH):
             self.logger.error("Unsupported match items provided in: "
-                              "%s. Expected from: %s.", ", ".join(req[
+                              "%s. Expected either: %s.", ", ".join(req[
                                                                "match"]),
                               ", ".join(_SUPPORTED_MATCH))
             return False
