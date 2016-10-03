@@ -31,6 +31,7 @@ import config
 from flow import icmp_flow
 from flow import tcp_flow
 from flow import udp_flow
+from data_miner import DataMiner
 
 #*** Instantiate Config class:
 _config = config.Config()
@@ -41,8 +42,6 @@ _mongo_addr = _config.get_value("mongo_addr")
 _mongo_port = _config.get_value("mongo_port")
 
 logger = logging.getLogger(__name__)
-
-# TODO The test needs to be written before the DataMiner object is implemented. The object would be somewhat difficult to test within unit tests otherwise.
 
 
 def test_data_miner():
@@ -63,7 +62,150 @@ def test_data_miner():
         Expand 'Frame' in the middle pane,
         right-click 'Epoch Time' Copy -> Value
     """
-    
+    # Install TCP flows into fcip_tcp
+    _install_tcp_flows()
+
+    # Create DataMiner object
+    data_miner = DataMiner(_config)
+
+    # Test!
+    _test_mine_bad_req(data_miner)
+    _test_mine_unsupported_req(data_miner)
+    _test_mine_success(data_miner)
+
+
+def _test_mine_bad_req(data_miner):
+    """Test that a DataMiner object gracefully handles improperly
+    formatted requests.
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    # A request that is not a dict
+    req = "This is not a Python dict."
+    assert data_miner.mine_raw_data(req) == 0
+    # An empty request
+    req = {}
+    assert data_miner.mine_raw_data(req) == 0
+    # Requests with missing entries
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "proto": ["tcp"]}
+    assert data_miner.mine_raw_data(req) == 0
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"]}
+    assert data_miner.mine_raw_data(req) == 0
+    req = {"proto": ["tcp"], "features": ["total_pkt_len_A",
+                                          "total_pkt_len_B",
+                                          "total_pkt_cnt_A",
+                                          "total_pkt_cnt_B",
+                                          "latest_timestamp",
+                                          "packet_timestamps"]}
+    assert data_miner.mine_raw_data(req) == 0
+    # A request with too many entries
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": ["tcp"], "another": "value!!"}
+    assert data_miner.mine_raw_data(req) == 0
+    # Requests with entries that are not the required type.
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": []}  # The proto entry should not be empty
+    assert data_miner.mine_raw_data(req) == 0
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": "tcp"}  # The proto entry should be a list
+    assert data_miner.mine_raw_data(req) == 0
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": [],
+           "proto": ["tcp"]}  # The features entry should not be empty
+    assert data_miner.mine_raw_data(req) == 0
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": "total_pkt_len_A",
+           "proto": ["tcp"]}  # The features entry should be a list
+    assert data_miner.mine_raw_data(req) == 0
+    req = {"match": {},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": ["tcp"]}  # The match entry should not be empty
+    assert data_miner.mine_raw_data(req) == 0
+    req = {"match": "This should fail!",
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": ["tcp"]}  # The features entry should be a dict
+    assert data_miner.mine_raw_data(req) == 0
+
+
+def _test_mine_unsupported_req(data_miner):
+    """Test that a DataMiner object gracefully handled improperly
+    unsupported requests.
+
+    Unsupported requests contain values that a DataMiner object
+    should not be able to handle.
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    # A request with an unsupported transport protocol: MPTCP
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": ["mptcp"]}
+    assert data_miner.mine_raw_data(req) == 0
+    # A request with unsupported match values
+    req = {"match": {"ip_A": "10.1.0.1", "ip_B": "10.1.0.2",
+                     "port_A": 43297, "port_B": 80},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": ["tcp"]}
+    assert data_miner.mine_raw_data(req) == 0
+    # A request with unsupported features values
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["hash"],
+           "proto": ["tcp"]}
+    assert data_miner.mine_raw_data(req) ==0
+
+
+
+def _test_mine_success(data_miner):
+    """Test that information can be successfully fetched.
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    req = {"proto": ["tcp"],
+           "match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"]}
+    exp_tcp_result = {"total_pkt_len_A": 277, "total_pkt_len_B": 302,
+                      "total_pkt_cnt_A": 4, "total_pkt_cnt_B": 3,
+                      "latest_timestamp": 1458782852.091702,
+                      "packet_timestamps": [1458782847.829442,
+                                            1458782847.830399,
+                                            1458782847.830426,
+                                            1458782852.090698,
+                                            1458782852.091542,
+                                            1458782852.091692,
+                                            1458782852.091702]}
+    dm_result = data_miner.mine_raw_data(req)
+    assert type(dm_result) is dict
+    assert cmp(exp_tcp_result, dm_result) == 0
+
+
+
+def _install_tcp_flows():
+    """Insert some TCP flows into the fcip_tcp collection and check
+    their validity.
+    """
     #*** Flow 1 TCP handshake packet 1
     # 10.1.0.1 10.1.0.2 TCP 74 43297 > http [SYN] Seq=0 Win=29200 Len=0 MSS=1460 SACK_PERM=1 TSval=5982511 TSecr=0 WS=64
     flow1_pkt1 = binascii.unhexlify("080027c8db910800272ad6dd08004510003c19fd400040060cab0a0100010a010002a9210050c37250d200000000a002721014330000020405b40402080a005b492f0000000001030306")
@@ -109,7 +251,7 @@ def test_data_miner():
 
     #*** Sanity check can read into dpkt:
     eth = dpkt.ethernet.Ethernet(flow1_pkt1)
-    eth_src = mac_addr(eth.src)
+    eth_src = _mac_addr(eth.src)
     assert eth_src == '08:00:27:2a:d6:dd'
 
     #*** Instantiate a flow object:
@@ -274,7 +416,7 @@ def test_data_miner():
     assert flow.max_packet_size() == max(pkt_len)
 
 
-def mac_addr(address):
+def _mac_addr(address):
     """
     Convert a MAC address to a readable/printable string
     """
