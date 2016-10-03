@@ -63,8 +63,9 @@ def test_data_miner():
         right-click 'Epoch Time' Copy -> Value
     """
     # Install flows into FCIP database collections
-    _install_tcp_flows()
     _install_icmp_flows()
+    _install_tcp_flows()
+    _install_udp_flows()
 
     # Create DataMiner object
     data_miner = DataMiner(_config)
@@ -78,6 +79,9 @@ def test_data_miner():
     # Unit tests for mining TCP flow data
     _test_mine_missing_tcp(data_miner)
     _test_mine_success_tcp(data_miner)
+    # Unit tests for mining TCP flow data
+    _test_mine_missing_udp(data_miner)
+    _test_mine_success_udp(data_miner)
 
 
 def _test_mine_bad_req(data_miner):
@@ -274,6 +278,47 @@ def _test_mine_success_tcp(data_miner):
     assert cmp(exp_tcp_result, dm_result) == 0
 
 
+def _test_mine_missing_udp(data_miner):
+    """Test that a DataMiner object can handle fetching UDP flow
+    information that does not exist.
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    req = {"proto": "udp",
+           "match": {"hash": "a18e096b64d59bdbd6809f9bf083779b"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"]}
+
+    dm_result = data_miner.mine_raw_data(req)
+    assert type(dm_result) is dict
+    assert len(dm_result) == 0
+
+
+def _test_mine_success_udp(data_miner):
+    """Test that UDP flow information can be successfully fetched.
+
+    :param data_miner: DataMiner object to mine with.
+    """
+    req = {"proto": "udp",
+           "match": {"hash": "a18e096b64d59bdbd6809f9bf08377ad"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"]}
+    exp_tcp_result = {"total_pkt_len_A": 316, "total_pkt_len_B": 291,
+                      "total_pkt_cnt_A": 3, "total_pkt_cnt_B": 3,
+                      "latest_timestamp": 1475534725.4327881,
+                      "packet_timestamps": [1475534554.8924124,
+                                            1475534576.7033346,
+                                            1475534615.6989126,
+                                            1475534641.599546,
+                                            1475534698.5478644,
+                                            1475534725.4327881]}
+    dm_result = data_miner.mine_raw_data(req)
+    assert type(dm_result) is dict
+    assert cmp(exp_tcp_result, dm_result) == 0
+
+
 def _install_icmp_flows():
     """Insert some ICMP flows into the fcip_icmp collection and check
     their validity.
@@ -390,7 +435,6 @@ def _install_icmp_flows():
     assert flow.icmp_type == 0
     assert flow.icmp_code == 0
     assert flow.packet_direction == 's2c'
-
 
 
 def _install_tcp_flows():
@@ -605,6 +649,136 @@ def _install_tcp_flows():
     assert flow.packet_direction == 'c2s'
     assert flow.verified_direction == 'verified-SYN'
     assert flow.max_packet_size() == max(pkt_len)
+
+
+def _install_udp_flows():
+    """Insert some UDP flows into the fcip_udp collection and check
+    their validity.
+    """
+    #*** Flow 1 client->server
+    # 1	0.000000000	172.16.0.101	172.16.0.10	UDP	98	51199 -> 45123  Len=56
+    flow1_pkt1 = binascii.unhexlify("0800278a923b0800278801300800450000549d08400040114501ac100065ac10000ac7ffb0430040adaf436c69656e742d3e5365727665723a20436f6e6e656374656420776974683a206e63202d75203137322e31362e302e31302034353132330a")
+    flow1_pkt1_timestamp = 1475534554.892412520
+
+    #*** Flow 1 server->client
+    # 2	21.810922060	172.16.0.10	172.16.0.101	UDP	87	45123 -> 51199  Len=45
+    flow1_pkt2 = binascii.unhexlify("0800278801300800278a923b0800450000493d9040004011a484ac10000aac100065b043c7ff003558d65365727665722d3e436c69656e743a20486f7374696e6720776974683a206e63202d75202d6c2034353132330a")
+    flow1_pkt2_timestamp = 1475534576.703334580
+
+    #*** Flow 1 client->server
+    # 3	60.806499993	172.16.0.101	172.16.0.10	UDP	77	51199 -> 45123  Len=35
+    flow1_pkt3 = binascii.unhexlify("0800278a923b08002788013008004500003fd85a4000401109c4ac100065ac10000ac7ffb043002b0392436c69656e742d3e5365727665723a206e657463617420697320617765736f6d65210a")
+    flow1_pkt3_timestamp = 1475534615.698912513
+
+    #*** Flow 1 server->client
+    # 4	86.707133477	172.16.0.10	172.16.0.101	UDP	105	45123 -> 51199  Len=63
+    flow1_pkt4 = binascii.unhexlify("0800278801300800278a923b08004500005b4abe400040119744ac10000aac100065b043c7ff004758e85365727665722d3e436c69656e743a20492061677265652120497420697320736f206561737920746f2073656e642064617461207573696e67205544502e0a")
+    flow1_pkt4_timestamp = 1475534641.599545997
+
+    #*** Flow 1 client->server
+    # 5	143.655451995	172.16.0.101	172.16.0.10	UDP	141	51199 -> 45123  Len=99
+    flow1_pkt5 = binascii.unhexlify("0800278a923b08002788013008004500007fec6c40004011f571ac100065ac10000ac7ffb043006b7d36436c69656e742d3e5365727665723a2045786163746c792c20686f77657665722074686520666c6f77206475726174696f6e2077696c6c206265206c6f6e672061732069742074616b65732074696d6520746f2074797065206d657373616765732e0a")
+    flow1_pkt5_timestamp = 1475534698.547864515
+
+    #*** Flow 1 server->client
+    # 6	170.540375720	172.16.0.10	172.16.0.101	UDP	99	45123 -> 51199  Len=57
+    flow1_pkt6 = binascii.unhexlify("0800278801300800278a923b08004500005559524000401188b6ac10000aac100065b043c7ff004158e25365727665722d3e436c69656e743a205468617420697320646f65732e20436c6f73696e672073657276657220636f6e6e656374696f6e2e0a")
+    flow1_pkt6_timestamp = 1475534725.432788240
+
+    #*** Packet lengths for flow 1 on the wire (null value for index 0):
+    pkt_len = [0, 98, 87, 77, 105, 141, 99]
+
+    #*** Sanity check can read into dpkt:
+    eth = dpkt.ethernet.Ethernet(flow1_pkt1)
+    eth_src = _mac_addr(eth.src)
+    assert eth_src == '08:00:27:88:01:30'
+
+    #*** Instantiate a flow object:
+    flow = udp_flow.UDPFlow(logger, _mongo_addr, _mongo_port)
+
+    #*** Test Flow 1 Packet 1:
+    flow.ingest_packet(flow1_pkt1, flow1_pkt1_timestamp)
+    assert flow.packet_count == 1
+    assert flow.packet_length == pkt_len[1]
+    assert flow.ip_src == "172.16.0.101"
+    assert flow.ip_dst == "172.16.0.10"
+    assert flow.client == "172.16.0.101"
+    assert flow.server == "172.16.0.10"
+    assert flow.udp_src == 51199
+    assert flow.udp_dst == 45123
+    assert flow.packet_direction == 'c2s'
+    assert flow.payload == "Client->Server: Connected with: nc -u " \
+                           "172.16.0.10 45123\n"
+
+    #*** Test Flow 1 Packet 2:
+    flow.ingest_packet(flow1_pkt2, flow1_pkt2_timestamp)
+    assert flow.packet_count == 2
+    assert flow.packet_length == pkt_len[2]
+    assert flow.ip_src == "172.16.0.10"
+    assert flow.ip_dst == "172.16.0.101"
+    assert flow.client == "172.16.0.101"
+    assert flow.server == "172.16.0.10"
+    assert flow.udp_src == 45123
+    assert flow.udp_dst == 51199
+    assert flow.packet_direction == 's2c'
+    assert flow.payload == "Server->Client: Hosting with: nc -u -l " \
+                           "45123\n"
+
+    #*** Test Flow 1 Packet 3:
+    flow.ingest_packet(flow1_pkt3, flow1_pkt3_timestamp)
+    assert flow.packet_count == 3
+    assert flow.packet_length == pkt_len[3]
+    assert flow.ip_src == "172.16.0.101"
+    assert flow.ip_dst == "172.16.0.10"
+    assert flow.client == "172.16.0.101"
+    assert flow.server == "172.16.0.10"
+    assert flow.udp_src == 51199
+    assert flow.udp_dst == 45123
+    assert flow.packet_direction == 'c2s'
+    assert flow.payload == "Client->Server: netcat is awesome!\n"
+
+    #*** Test Flow 1 Packet 4:
+    flow.ingest_packet(flow1_pkt4, flow1_pkt4_timestamp)
+    assert flow.packet_count == 4
+    assert flow.packet_length == pkt_len[4]
+    assert flow.ip_src == "172.16.0.10"
+    assert flow.ip_dst == "172.16.0.101"
+    assert flow.client == "172.16.0.101"
+    assert flow.server == "172.16.0.10"
+    assert flow.udp_src == 45123
+    assert flow.udp_dst == 51199
+    assert flow.packet_direction == 's2c'
+    assert flow.payload == "Server->Client: I agree! It is so easy to " \
+                           "send data using UDP.\n"
+
+    #*** Test Flow 1 Packet 5:
+    flow.ingest_packet(flow1_pkt5, flow1_pkt5_timestamp)
+    assert flow.packet_count == 5
+    assert flow.packet_length == pkt_len[5]
+    assert flow.ip_src == "172.16.0.101"
+    assert flow.ip_dst == "172.16.0.10"
+    assert flow.client == "172.16.0.101"
+    assert flow.server == "172.16.0.10"
+    assert flow.udp_src == 51199
+    assert flow.udp_dst == 45123
+    assert flow.packet_direction == 'c2s'
+    assert flow.payload == "Client->Server: Exactly, however the flow " \
+                           "duration will be long as it takes time to " \
+                           "type messages.\n"
+
+    #*** Test Flow 1 Packet 6:
+    flow.ingest_packet(flow1_pkt6, flow1_pkt6_timestamp)
+    assert flow.packet_count == 6
+    assert flow.packet_length == pkt_len[6]
+    assert flow.ip_src == "172.16.0.10"
+    assert flow.ip_dst == "172.16.0.101"
+    assert flow.client == "172.16.0.101"
+    assert flow.server == "172.16.0.10"
+    assert flow.udp_src == 45123
+    assert flow.udp_dst == 51199
+    assert flow.packet_direction == 's2c'
+    assert flow.payload == "Server->Client: That is does. Closing " \
+                           "server connection.\n"
 
 
 def _mac_addr(address):
