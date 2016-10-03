@@ -69,12 +69,12 @@ def test_data_miner():
     data_miner = DataMiner(_config)
 
     # Test!
-    _test_mine_bad_req(data_miner)
-    _test_mine_unsupported_req(data_miner)
-    _test_mine_success(data_miner)
+    _test_mine_bad_req_tcp(data_miner)
+    _test_mine_unsupported_req_tcp(data_miner)
+    _test_mine_success_tcp(data_miner)
 
 
-def _test_mine_bad_req(data_miner):
+def _test_mine_bad_req_tcp(data_miner):
     """Test that a DataMiner object gracefully handles improperly
     formatted requests.
 
@@ -144,7 +144,7 @@ def _test_mine_bad_req(data_miner):
     assert data_miner.mine_raw_data(req) == 0
 
 
-def _test_mine_unsupported_req(data_miner):
+def _test_mine_unsupported_req_tcp(data_miner):
     """Test that a DataMiner object gracefully handled improperly
     unsupported requests.
 
@@ -160,6 +160,14 @@ def _test_mine_unsupported_req(data_miner):
                         "latest_timestamp", "packet_timestamps"],
            "proto": ["mptcp"]}
     assert data_miner.mine_raw_data(req) == 0
+    # A request with an unsupported transport protocol amongst
+    # supported protocols: MPTCP
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
+           "proto": ["icmp", "mptcp", "tcp"]}
+    assert data_miner.mine_raw_data(req) == 0
     # A request with unsupported match values
     req = {"match": {"ip_A": "10.1.0.1", "ip_B": "10.1.0.2",
                      "port_A": 43297, "port_B": 80},
@@ -168,15 +176,30 @@ def _test_mine_unsupported_req(data_miner):
                         "latest_timestamp", "packet_timestamps"],
            "proto": ["tcp"]}
     assert data_miner.mine_raw_data(req) == 0
-    # A request with unsupported features values
-    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
-           "features": ["hash"],
+    # A request with unsupported match values amongst supported match
+    # values
+    req = {"match": {"ip_A": "10.1.0.1", "ip_B": "10.1.0.2",
+                     "port_A": 43297, "port_B": 80,
+                     "hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["total_pkt_len_A", "total_pkt_len_B",
+                        "total_pkt_cnt_A", "total_pkt_cnt_B",
+                        "latest_timestamp", "packet_timestamps"],
            "proto": ["tcp"]}
-    assert data_miner.mine_raw_data(req) ==0
+    assert data_miner.mine_raw_data(req) == 0
+    # A request with unsupported features
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["this_does_not_exist"],
+           "proto": ["tcp"]}
+    assert data_miner.mine_raw_data(req) == 0
+    # A request with unsupported features amongst supported features
+    req = {"match": {"hash": "3ac5055cc5d0073d1f0b3bc18d3fb3e3"},
+           "features": ["this_does_not_exist", "latest_timestamp",
+                        "packet_timestamps"],
+           "proto": ["tcp"]}
+    assert data_miner.mine_raw_data(req) == 0
 
 
-
-def _test_mine_success(data_miner):
+def _test_mine_success_tcp(data_miner):
     """Test that information can be successfully fetched.
 
     :param data_miner: DataMiner object to mine with.
@@ -199,7 +222,6 @@ def _test_mine_success(data_miner):
     dm_result = data_miner.mine_raw_data(req)
     assert type(dm_result) is dict
     assert cmp(exp_tcp_result, dm_result) == 0
-
 
 
 def _install_tcp_flows():
