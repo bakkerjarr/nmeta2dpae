@@ -162,8 +162,7 @@ class DataMiner(object):
                                  "preprocessing checks: %s",
                                  req["proto"])
             return 0
-        # TODO Clean up the data for its return to the caller by filtering by req["features"]
-        return 0  # We should not reach this!
+        return self._filter_data(data, req["features"])
 
     def _fetch_icmp_flows(self, match):
         """Fetch data from the fcip_icmp MongoDB collection.
@@ -209,6 +208,21 @@ class DataMiner(object):
             self.logger.debug("No flow data found for match: %s", match)
             return {}  # No data was found, return an empty list.
         return fcip_doc
+
+    def _filter_data(self, data, features):
+        """Filter a dict of data by selecting the desirable features.
+
+        :param data: Dict of data to filter.
+        :param features: The features we wish to keep in the data.
+        :return: Dict of filtered data.
+        """
+        filtered_data = data.copy()
+        req_feat = set(features)
+        data_feat = filtered_data.keys()
+        filtered_keys = [i for i in data_feat if i not in req_feat]
+        for key in filtered_keys:
+            filtered_data.pop(key, None)
+        return filtered_data
 
     def _check_bad_dm_req(self, req):
         """Check that a data mining request is formatted correctly.
