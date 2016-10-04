@@ -35,6 +35,7 @@ controlplane_logging_level_s: INFO
 dp_logging_level_s: INFO
 tc_logging_level_s: INFO
 tc_policy_dpae_logging_level_s: INFO
+data_miner_logging_level_s: INFO
 #
 #========== CONSOLE LOGGING =========================
 #*** Set to 1 if want to log to console:
@@ -56,6 +57,7 @@ controlplane_logging_level_c: DEBUG
 dp_logging_level_c: DEBUG
 tc_logging_level_c: DEBUG
 tc_policy_dpae_logging_level_c: DEBUG
+data_miner_logging_level_c: DEBUG
 requests_logging_level: CRITICAL
 #
 #========== DPAE JOIN TIMING PARAMETERS ===============

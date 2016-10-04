@@ -123,8 +123,8 @@ class ICMPFlow(flow.Flow):
         #*** DPAE database - delete all previous entries:
         result = self.fcip.delete_many({})
         self.logger.info("Initialising FCIP database, Deleted %s "
-                         "previous entries from fcip_database",
-                         result.deleted_count)
+                         "previous entries from fcip_database fcip_icmp "
+                         "collection", result.deleted_count)
 
         #*** Database index for performance:
         self.fcip.create_index([("hash", 1)])
