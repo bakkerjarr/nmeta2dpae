@@ -272,9 +272,10 @@ class TC(object):
                     result_classifier = classifier.classifier(flow_type)
                 except:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
-                    self.logger.error("Exception in custom classifier %s."
-                                    "Exception %s, %s, %s",
-                                classifier, exc_type, exc_value, exc_traceback)
+                    self.logger.error("Exception in custom classifier "
+                                      "%s. Exception %s, %s, %s",
+                                      classifier, exc_type, exc_value,
+                                      exc_traceback)
                     return result
 
             #*** TBD, this will need updating for more types of return actions:
