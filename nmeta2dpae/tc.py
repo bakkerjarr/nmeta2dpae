@@ -69,6 +69,8 @@ class TC(object):
     """
 
     def __init__(self, _config):
+        # TODO Should the config be stored
+        self._config = _config
         #*** Get logging config values from config class:
         _logging_level_s = _config.get_value \
                                     ('tc_logging_level_s')
@@ -158,10 +160,12 @@ class TC(object):
 
         for tc_type, module_name in _classifiers:
             #*** Dynamically import and instantiate class from classifiers dir:
-            self.logger.debug("Importing module type=%s module_name=%s",
-                                        tc_type, "classifiers." + module_name)
+            self.logger.debug("Importing module type=%s "
+                              "module_name=%s", tc_type,
+                              "classifiers." + module_name)
             try:
-                module = importlib.import_module("classifiers." + module_name)
+                module = importlib.import_module("classifiers." +
+                                                 module_name)
             except:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 self.logger.error("Failed to dynamically load classifier "
@@ -177,7 +181,11 @@ class TC(object):
             #*** Dynamically instantiate class 'Classifier':
             self.logger.debug("Instantiating module class")
             class_ = getattr(module, 'Classifier')
-            self.classifiers.append(class_(self.logger))
+            if tc_type == "machine_learning":
+                self.classifiers.append(class_(self._config,
+                                               self._data_miner))
+            else:
+                self.classifiers.append(class_(self.logger))
 
     def classify_dpkt_wrapper(self, pkt, pkt_receive_timestamp, if_name):
         """
