@@ -57,13 +57,11 @@ class Classifier(object):
     _DATASET_DIR = "/home/dev/Documents/datasets/iscx2012_ddos"
     _DATASET_FILEs = []
 
-
-    def __init__(self, config, data_miner):
+    def __init__(self, config):
         """
         Initialise the classifier
 
         :param config: Logging configuration.
-        :param data_miner: An object for mining FCIP database data.
         """
         #*** Get logging config values from config class:
         _logging_level_s = config.get_value \
@@ -110,7 +108,6 @@ class Classifier(object):
                 self.console_handler.setLevel(_logging_level_c)
                 self.logger.addHandler(self.console_handler)
 
-        self._data_miner = data_miner
         self.logger.debug("Initialising Random Forest DDoS "
                           "classifier...")
 

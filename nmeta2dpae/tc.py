@@ -181,11 +181,7 @@ class TC(object):
             #*** Dynamically instantiate class 'Classifier':
             self.logger.debug("Instantiating module class")
             class_ = getattr(module, 'Classifier')
-            if tc_type == "machine_learning":
-                self.classifiers.append(class_(self._config,
-                                               self._data_miner))
-            else:
-                self.classifiers.append(class_(self.logger))
+            self.classifiers.append(class_(self._config))
 
     def classify_dpkt_wrapper(self, pkt, pkt_receive_timestamp, if_name):
         """
