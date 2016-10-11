@@ -90,7 +90,7 @@ class Classifier(object):
                 self.console_handler.setLevel(_logging_level_c)
                 self.logger.addHandler(self.console_handler)
 
-        self.logger.debug("Initialising payload_uri_1 classifier...")
+        self.logger.info("Initialising payload_uri_1 classifier...")
 
     def classifier(self, flow):
         """

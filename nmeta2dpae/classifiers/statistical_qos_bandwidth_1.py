@@ -87,7 +87,7 @@ class Classifier(object):
                 self.console_handler.setLevel(_logging_level_c)
                 self.logger.addHandler(self.console_handler)
 
-        self.logger.debug("Initialising statistical_qos_bandwidth_1 "
+        self.logger.info("Initialising statistical_qos_bandwidth_1 "
                           "classifier...")
 
     def classifier(self, flow):
