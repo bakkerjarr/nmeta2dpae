@@ -32,13 +32,20 @@ import logging
 import logging.handlers
 import coloredlogs
 
+# Classifier imports
+from sklearn.ensemble import RandomForestClassifier
+from util.iscx_2012_ddos import ISCX2012DDoS
+
+# Other imports
+import sys
+
 
 class Classifier(object):
     """
     A custom classifier module for import by nmeta2.
     """
 
-    _RANDOM_FOREST = {
+    _PARAM = {
         "n_estimators": 10,
         "criterion": "gini",
         "max_depth": None,
@@ -54,8 +61,6 @@ class Classifier(object):
         "verbose": 0,
         "warm_start": False,
         "class_weight": None}
-    _DATASET_DIR = "/home/dev/Documents/datasets/iscx2012_ddos"
-    _DATASET_FILEs = []
 
     def __init__(self, config):
         """
@@ -108,8 +113,42 @@ class Classifier(object):
                 self.console_handler.setLevel(_logging_level_c)
                 self.logger.addHandler(self.console_handler)
 
-        self.logger.debug("Initialising Random Forest DDoS "
-                          "classifier...")
+        self.logger.info("Initialising ml_ddos_random_forest "
+                         "classifier...")
+        self._iscx = ISCX2012DDoS(logging)
+        self._ds_data, self._ds_labels = \
+            self._iscx.ddos_random_forest_data()
+        self._rfor = RandomForestClassifier(n_estimators=self._PARAM[
+                                                "n_estimators"],
+                                            criterion=self._PARAM[
+                                                "criterion"],
+                                            max_depth=self._PARAM[
+                                                "max_depth"],
+                                            min_samples_split=self._PARAM[
+                                                "min_samples_split"],
+                                            min_samples_leaf=self._PARAM[
+                                                "min_samples_leaf"],
+                                            min_weight_fraction_leaf=self._PARAM[
+                                                "min_weight_fraction_leaf"],
+                                            max_features=self._PARAM[
+                                                "max_features"],
+                                            max_leaf_nodes=self._PARAM[
+                                                "max_leaf_nodes"],
+                                            bootstrap=self._PARAM[
+                                                "bootstrap"],
+                                            oob_score=self._PARAM[
+                                                "oob_score"],
+                                            n_jobs=self._PARAM[
+                                                "n_jobs"],
+                                            random_state=self._PARAM[
+                                                "random_state"],
+                                            verbose=self._PARAM[
+                                                "verbose"],
+                                            warm_start=self._PARAM[
+                                                "warm_start"],
+                                            class_weight=self._PARAM[
+                                                "class_weight"])
+        self._train_dataset()
 
     def classifier(self, flow):
         """
@@ -120,15 +159,28 @@ class Classifier(object):
         current context of the flow.
         .
         It returns a dictionary specifying a key/value that the flow
-        is part of an attack (or not if no classification
-        determination made).
+        is part of an attack or an empty dictionary if the flow is not.
         """
         # Dictionary to hold classification results:
         results = {}
-
+        self.logger.debug("Classifying flow: %s", flow.fcip_hash)
+        # Gather the required flow data so that the classifier can make
+        # a prediction.
+        # TODO Gather the required flow data
+        # Make the prediction and return any meaningful results.
+        # TODO Pass required flow data into self._rfor.predict()
+        attack_pred = self._rfor.predict(None)
+        if attack_pred:
+            results["ddos_attack"] = True
         return results
 
-    def _load_dataset(self):
-        """Read data from dataset for training.
+    def _train_dataset(self):
+        """Train the Random Forest classifier using data from a dataset.
         """
-        pass
+        self.logger.debug("Training classifier with data from a datset.")
+        if len(self._ds_data) < 1 or len(self._ds_labels) < 1:
+            self.logger.critical("Attempted to train classifier with "
+                                 "an empty dataset, aborting.")
+            sys.exit("Attempted to train classifier with an empty "
+                     "dataset.")
+        self._rfor.fit(self._ds_data, self._ds_labels)

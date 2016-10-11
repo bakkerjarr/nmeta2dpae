@@ -287,6 +287,9 @@ class TC(object):
                 result['qos_treatment'] = result_classifier['qos_treatment']
                 result['actions'] = 1
                 result['type'] = 'treatment'
+            elif "ddos_attack" in result_classifier:
+                result["type"] = "Attack"
+                result["subtype"] = "DDoS"
 
         #*** Suppress Elephant flows:
         #***  TBD, do on more than just IPv4 TCP...:
