@@ -36,6 +36,10 @@ import coloredlogs
 from sklearn.ensemble import RandomForestClassifier
 from util.iscx_2012_ddos import ISCX2012DDoS
 
+# Imports for processing data
+from numpy import float32
+import numpy.core.multiarray as np_array
+
 # Other imports
 import sys
 
@@ -43,6 +47,13 @@ import sys
 class Classifier(object):
     """
     A custom classifier module for import by nmeta2.
+
+    Uses the Random Forest method along with the following features:
+        - totalSourceBytes
+        - totalSourcePackets
+        - totalDestinationBytes
+        - totalDestinationPackets
+        - flow duration
     """
 
     _PARAM = {
@@ -165,11 +176,29 @@ class Classifier(object):
         results = {}
         self.logger.debug("Classifying flow: %s", flow.fcip_hash)
         # Gather the required flow data so that the classifier can make
-        # a prediction.
-        # TODO Gather the required flow data
+        # a prediction. NOTE that the ordering of the features for
+        # making a prediction must match the order of features as they
+        # are passed through for training.
+        flow_data = flow.fcip_doc
+        ip_src = flow.ip_src
+        if ip_src == flow_data["ip_A"]:
+            src_bytes = flow_data["total_pkt_len_A"]
+            src_pckts = flow_data["total_pkt_cnt_A"]
+            dst_bytes = flow_data["total_pkt_len_B"]
+            dst_pckts = flow_data["total_pkt_cnt_B"]
+        else:
+            src_bytes = flow_data["total_pkt_len_B"]
+            src_pckts = flow_data["total_pkt_cnt_B"]
+            dst_bytes = flow_data["total_pkt_len_A"]
+            dst_pckts = flow_data["total_pkt_cnt_A"]
+        start_time = flow_data["packet_timestamps"][0]
+        latest_time = flow_data["latest_timestamp"]
+        flow_duration = float(latest_time - start_time)
+        features = np_array.array([src_bytes, src_pckts, dst_bytes,
+                                   dst_pckts, flow_duration]).astype(
+                                                                 float32)
         # Make the prediction and return any meaningful results.
-        # TODO Pass required flow data into self._rfor.predict()
-        attack_pred = self._rfor.predict(None)
+        attack_pred = self._rfor.predict(features)
         if attack_pred:
             results["ddos_attack"] = True
         return results
@@ -181,6 +210,6 @@ class Classifier(object):
         if len(self._ds_data) < 1 or len(self._ds_labels) < 1:
             self.logger.critical("Attempted to train classifier with "
                                  "an empty dataset, aborting.")
-            sys.exit("Attempted to train classifier with an empty "
-                     "dataset.")
+            sys.exit("ABORTING: Attempted to train classifier with an "
+                     "empty dataset.")
         self._rfor.fit(self._ds_data, self._ds_labels)
