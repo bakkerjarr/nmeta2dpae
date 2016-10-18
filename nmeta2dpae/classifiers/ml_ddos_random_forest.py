@@ -15,8 +15,8 @@
 This module is part of the nmeta2 suite
 .
 It defines a custom traffic classifier for detecting DDoS attacks.
-Note that it is different to other custom classifiers as it gets
-passed config information and a data_miner object.
+Note that it is different to other custom classifiers as it uses a
+machine learning method (Random Forest).
 .
 To create your own custom classifier, copy this example to a new
 file in the same directory and update the code as required.
@@ -129,35 +129,35 @@ class Classifier(object):
         self._iscx = ISCX2012DDoS(logging)
         self._ds_data, self._ds_labels = \
             self._iscx.ddos_random_forest_data()
-        self._rfor = RandomForestClassifier(n_estimators=self._PARAM[
+        self._cls = RandomForestClassifier(n_estimators=self._PARAM[
                                                 "n_estimators"],
-                                            criterion=self._PARAM[
+                                           criterion=self._PARAM[
                                                 "criterion"],
-                                            max_depth=self._PARAM[
+                                           max_depth=self._PARAM[
                                                 "max_depth"],
-                                            min_samples_split=self._PARAM[
+                                           min_samples_split=self._PARAM[
                                                 "min_samples_split"],
-                                            min_samples_leaf=self._PARAM[
+                                           min_samples_leaf=self._PARAM[
                                                 "min_samples_leaf"],
-                                            min_weight_fraction_leaf=self._PARAM[
+                                           min_weight_fraction_leaf=self._PARAM[
                                                 "min_weight_fraction_leaf"],
-                                            max_features=self._PARAM[
+                                           max_features=self._PARAM[
                                                 "max_features"],
-                                            max_leaf_nodes=self._PARAM[
+                                           max_leaf_nodes=self._PARAM[
                                                 "max_leaf_nodes"],
-                                            bootstrap=self._PARAM[
+                                           bootstrap=self._PARAM[
                                                 "bootstrap"],
-                                            oob_score=self._PARAM[
+                                           oob_score=self._PARAM[
                                                 "oob_score"],
-                                            n_jobs=self._PARAM[
+                                           n_jobs=self._PARAM[
                                                 "n_jobs"],
-                                            random_state=self._PARAM[
+                                           random_state=self._PARAM[
                                                 "random_state"],
-                                            verbose=self._PARAM[
+                                           verbose=self._PARAM[
                                                 "verbose"],
-                                            warm_start=self._PARAM[
+                                           warm_start=self._PARAM[
                                                 "warm_start"],
-                                            class_weight=self._PARAM[
+                                           class_weight=self._PARAM[
                                                 "class_weight"])
         self._train_dataset()
 
@@ -177,8 +177,8 @@ class Classifier(object):
         self.logger.debug("Classifying flow: %s", flow.fcip_hash)
         # Gather the required flow data so that the classifier can make
         # a prediction. NOTE that the ordering of the features for
-        # making a prediction must match the order of features as they
-        # are passed through for training.
+        # making a prediction must match the order of features that
+        # were passed through for training.
         flow_data = flow.fcip_doc
         ip_src = flow.ip_src
         if ip_src == flow_data["ip_A"]:
@@ -198,7 +198,7 @@ class Classifier(object):
                                    dst_pckts, flow_duration]).astype(
                                                                  float32)
         # Make the prediction and return any meaningful results.
-        attack_pred = self._rfor.predict(features)
+        attack_pred = self._cls.predict(features)
         if attack_pred:
             results["ddos_attack"] = True
         return results
@@ -212,4 +212,4 @@ class Classifier(object):
                                  "an empty dataset, aborting.")
             sys.exit("ABORTING: Attempted to train classifier with an "
                      "empty dataset.")
-        self._rfor.fit(self._ds_data, self._ds_labels)
+        self._cls.fit(self._ds_data, self._ds_labels)
