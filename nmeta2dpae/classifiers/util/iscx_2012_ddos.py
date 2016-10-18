@@ -22,6 +22,7 @@ Version 2.x Toulouse Code
 
 # Imports for reading and processing data
 from lxml import etree
+import math
 from numpy import float32
 import numpy.core.multiarray as np_array
 
@@ -49,6 +50,30 @@ class ISCX2012DDoS(object):
             files.append(os.path.join(self._DATASET_DIR, f))
         self._read_data(files)
 
+    def ddos_knn_data(self):
+        """Prepare data for the ml_ddos_knn classifier.
+
+        The features are totalSourceBytes, totalDestinationBytes,
+        and flow duration.
+
+        :return: Tuple of data and labels as NumPy arrays.
+        """
+        self._logging.debug("Preparing data for K Nearest Neighbours "
+                            "DDoS attack classifier.")
+        features = ["totalSourceBytes", "totalDestinationBytes",
+                    "startDateTime", "stopDateTime"]
+        selected_data = self._return_features(self._raw_data, features)
+        transformed_data = []
+        for flow in selected_data:
+            new_entry = flow[0:2]  # copy in the first 2 elements
+            start_dt = datetime.strptime(flow[2], "%Y-%m-%dT%H:%M:%S")
+            stop_dt = datetime.strptime(flow[3], "%Y-%m-%dT%H:%M:%S")
+            duration = (stop_dt-start_dt).seconds
+            new_entry.append(duration)
+            transformed_data.append(new_entry)
+        return (np_array.array(transformed_data).astype(float32),
+                np_array.array(self._raw_labels).astype(float32))
+
     def ddos_random_forest_data(self):
         """Prepare data for the ml_ddos_random_forest classifier.
 
@@ -68,6 +93,42 @@ class ISCX2012DDoS(object):
             new_entry = flow[0:4]  # copy in the first 4 elements
             start_dt = datetime.strptime(flow[4], "%Y-%m-%dT%H:%M:%S")
             stop_dt = datetime.strptime(flow[5], "%Y-%m-%dT%H:%M:%S")
+            duration = (stop_dt-start_dt).seconds
+            new_entry.append(duration)
+            transformed_data.append(new_entry)
+        return (np_array.array(transformed_data).astype(float32),
+                np_array.array(self._raw_labels).astype(float32))
+
+    def ddos_svm_rbf_data(self):
+        """Prepare data for the ml_ddos_svm_rbf classifier.
+
+        The features are log(totalSourceBytes), totalSourcePackets,
+        and flow duration.
+
+        :return: Tuple of data and labels as NumPy arrays.
+        """
+        self._logging.debug("Preparing data for SVM (RBF kernel) "
+                            "DDoS attack classifier.")
+        features = ["totalSourceBytes", "totalSourcePackets",
+                    "startDateTime", "stopDateTime"]
+        selected_data = self._return_features(self._raw_data, features)
+        transformed_data = []
+        for flow in selected_data:
+            new_entry = []
+            src_bytes = 0
+            try:
+                src_bytes = math.log(float(flow[0]))
+            except ValueError:
+                # Log (base 10) could not be evaluated, so set it to 0.
+                # This has arisen as the number of source bytes is 0.
+                # If the number of source bytes as listed in the
+                # dataset is not 0, then something is wrong with the
+                # data.
+                pass
+            new_entry.append(src_bytes)
+            new_entry.append(flow[1])  # copy in totalSourcePackets
+            start_dt = datetime.strptime(flow[2], "%Y-%m-%dT%H:%M:%S")
+            stop_dt = datetime.strptime(flow[3], "%Y-%m-%dT%H:%M:%S")
             duration = (stop_dt-start_dt).seconds
             new_entry.append(duration)
             transformed_data.append(new_entry)
