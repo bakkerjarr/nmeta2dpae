@@ -230,7 +230,7 @@ class TC(object):
                 udp_src = udp.sport
                 udp_dst = udp.dport
             elif ip.p == _IP_PROTO_ICMP:
-                icmp = ip.id
+                icmp = ip.data
 
         #*** Check for Identity Indicators:
         if udp:
