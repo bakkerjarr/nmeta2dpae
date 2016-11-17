@@ -69,6 +69,8 @@ class TC(object):
     """
 
     def __init__(self, _config):
+        # TODO Should the config be stored
+        self._config = _config
         #*** Get logging config values from config class:
         _logging_level_s = _config.get_value \
                                     ('tc_logging_level_s')
@@ -158,10 +160,12 @@ class TC(object):
 
         for tc_type, module_name in _classifiers:
             #*** Dynamically import and instantiate class from classifiers dir:
-            self.logger.debug("Importing module type=%s module_name=%s",
-                                        tc_type, "classifiers." + module_name)
+            self.logger.debug("Importing module type=%s "
+                              "module_name=%s", tc_type,
+                              "classifiers." + module_name)
             try:
-                module = importlib.import_module("classifiers." + module_name)
+                module = importlib.import_module("classifiers." +
+                                                 module_name)
             except:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 self.logger.error("Failed to dynamically load classifier "
@@ -177,7 +181,7 @@ class TC(object):
             #*** Dynamically instantiate class 'Classifier':
             self.logger.debug("Instantiating module class")
             class_ = getattr(module, 'Classifier')
-            self.classifiers.append(class_(self.logger))
+            self.classifiers.append(class_(self._config))
 
     def classify_dpkt_wrapper(self, pkt, pkt_receive_timestamp, if_name):
         """
@@ -226,7 +230,7 @@ class TC(object):
                 udp_src = udp.sport
                 udp_dst = udp.dport
             elif ip.p == _IP_PROTO_ICMP:
-                icmp = ip.id
+                icmp = ip.data
 
         #*** Check for Identity Indicators:
         if udp:
@@ -272,9 +276,10 @@ class TC(object):
                     result_classifier = classifier.classifier(flow_type)
                 except:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
-                    self.logger.error("Exception in custom classifier %s."
-                                    "Exception %s, %s, %s",
-                                classifier, exc_type, exc_value, exc_traceback)
+                    self.logger.error("Exception in custom classifier "
+                                      "%s. Exception %s, %s, %s",
+                                      classifier, exc_type, exc_value,
+                                      exc_traceback)
                     return result
 
             #*** TBD, this will need updating for more types of return actions:
@@ -282,6 +287,9 @@ class TC(object):
                 result['qos_treatment'] = result_classifier['qos_treatment']
                 result['actions'] = 1
                 result['type'] = 'treatment'
+            elif "ddos_attack" in result_classifier:
+                result["type"] = "Attack"
+                result["subtype"] = "DDoS"
 
         #*** Suppress Elephant flows:
         #***  TBD, do on more than just IPv4 TCP...:

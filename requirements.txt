@@ -3,3 +3,7 @@ coloredlogs
 pymongo
 dpkt
 scapy
+lxml
+numpy
+sklearn
+scipy
