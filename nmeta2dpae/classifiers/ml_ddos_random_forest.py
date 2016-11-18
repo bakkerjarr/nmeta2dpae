@@ -198,7 +198,7 @@ class Classifier(object):
                                    dst_pckts, flow_duration]).astype(
                                                                  float32)
         # Make the prediction and return any meaningful results.
-        attack_pred = self._cls.predict(features)
+        attack_pred = self._cls.predict(features.reshape(1, -1))
         if attack_pred:
             results["ddos_attack"] = True
         return results
@@ -206,10 +206,12 @@ class Classifier(object):
     def _train_dataset(self):
         """Train the Random Forest classifier using data from a dataset.
         """
-        self.logger.debug("Training classifier with data from a datset.")
+        self.logger.debug("Training classifier...")
         if len(self._ds_data) < 1 or len(self._ds_labels) < 1:
             self.logger.critical("Attempted to train classifier with "
                                  "an empty dataset, aborting.")
             sys.exit("ABORTING: Attempted to train classifier with an "
                      "empty dataset.")
         self._cls.fit(self._ds_data, self._ds_labels)
+        self.logger.info("Training complete for Random Forest DDoS "
+                         "classifier.")
