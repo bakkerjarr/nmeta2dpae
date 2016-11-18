@@ -33,8 +33,8 @@ import os
 
 class ISCX2012DDoS(object):
 
-    _DATASET_DIR = "/home/dev/Documents/datasets/iscx2012_ddos"
-    _DATASET_FILES = []
+    _DATASET_DIR = "/home/dev/Documents/iscxddos_train"
+    _DATASET_FILES = ["iscx2012ddos_training_set_fold_1.xml"]
 
     def __init__(self, logging):
         """Initialise.
