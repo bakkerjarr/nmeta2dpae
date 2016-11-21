@@ -44,7 +44,7 @@ import numpy.core.multiarray as np_array
 import sys
 
 # Imports for evaluation
-from time import clock
+from time import time
 import datetime
 
 # TODO comment out logging calls for evaluation
@@ -137,7 +137,7 @@ class Classifier(object):
                                             "D%Y-%m-%d_h%Hm%Ms%S")
         self._fname_train = "train_" + dt_now + ".csv"
         self._fname_predict = "predict_" + dt_now + ".csv"
-        time_start = clock() # TODO change based on motivation
+        time_start = time()
         self._iscx = ISCX2012DDoS(logging)
         self._ds_data, self._ds_labels = \
             self._iscx.ddos_random_forest_data()
@@ -172,7 +172,7 @@ class Classifier(object):
                                            class_weight=self._PARAM[
                                                 "class_weight"])
         self._train_dataset()
-        time_stop = clock()
+        time_stop = time()
         time_duration = time_stop - time_start
         with open(self._fname_train, "a") as f_train:
             dt_now = datetime.datetime.strftime(datetime.datetime.now(),
@@ -194,7 +194,7 @@ class Classifier(object):
         is part of an attack or an empty dictionary if the flow is not.
         """
         # Dictionary to hold classification results:
-        time_start = clock()
+        time_start = time()
         results = {}
         self.logger.debug("Classifying flow: %s", flow.fcip_hash)
         # Gather the required flow data so that the classifier can make
@@ -221,7 +221,7 @@ class Classifier(object):
                                                                  float32)
         # Make the prediction and return any meaningful results.
         attack_pred = self._cls.predict(features.reshape(1, -1))
-        time_stop = clock()
+        time_stop = time()
         # NOTE We stop recording the time here as we are only
         # concerned with classification time and not the time taken to
         # form a response.
