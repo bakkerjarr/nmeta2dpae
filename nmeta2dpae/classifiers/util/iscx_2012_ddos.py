@@ -29,6 +29,7 @@ import numpy.core.multiarray as np_array
 # Other imports
 from datetime import datetime
 import os
+import sys
 
 
 class ISCX2012DDoS(object):
@@ -142,7 +143,13 @@ class ISCX2012DDoS(object):
         """
         for fname in files:
             self._logging.info("Reading data from: %s", fname)
-            data_etree = etree.parse(fname)
+            data_etree = None
+            try:
+                data_etree = etree.parse(fname)
+            except IOError as err:
+                self._logging.critical("Unable to open file: %s. "
+                                       "Error: %s", fname, err)
+                sys.exit(1)
             tmp_data, tmp_labels = self._etree_to_dict(data_etree)
             self._raw_data.extend(tmp_data)
             self._raw_labels.extend(tmp_labels)
