@@ -226,14 +226,23 @@ class Classifier(object):
         # concerned with classification time and not the time taken to
         # form a response.
         time_duration = time_stop - time_start
-        # Writing these prediction times is going to impact on
-        # performance over time.
         with open(self._fname_predict, "a") as f_predict:
             dt_now = datetime.datetime.strftime(datetime.datetime.now(),
                                                 "%Y-%m-%dT%H:%M:%S")
-            f_predict.write("{0},{1},{2}\n".format(dt_now,
-                                                   "random_forest",
-                                                   time_duration))
+            # Record the classification time and some flow information
+            # that will help in identifying the flow during analysis.
+            f_predict.write("{0},{1},{2},{3},{4},{5},{6},{7},"
+                            "{8},{9},{10}\n".format(dt_now,
+                                                    "random_forest",
+                                                    time_duration,
+                                                    flow_data["ip_A"],
+                                                    flow_data["ip_B"],
+                                                    flow_data["port_A"],
+                                                    flow_data["port_B"],
+                                                    flow_data["client"],
+                                                    flow_data["server"],
+                                                    attack_pred,
+                                                    latest_time))
         if attack_pred:
             results["ddos_attack"] = True
         return results
