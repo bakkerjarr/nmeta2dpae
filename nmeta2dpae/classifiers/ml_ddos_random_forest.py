@@ -45,9 +45,8 @@ import sys
 
 # Imports for evaluation
 from time import time
+from util.training_notification import notify_train_complete
 import datetime
-
-# TODO comment out logging calls for evaluation
 
 
 class Classifier(object):
@@ -130,13 +129,12 @@ class Classifier(object):
                 self.console_handler.setLevel(_logging_level_c)
                 self.logger.addHandler(self.console_handler)
 
-        self.logger.info("Initialising ml_ddos_random_forest "
-                         "classifier...")
-        # Create file for logging test data
         dt_now = datetime.datetime.strftime(datetime.datetime.now(),
                                             "D%Y-%m-%d_h%Hm%Ms%S")
         self._fname_train = "train_" + dt_now + ".csv"
         self._fname_predict = "predict_" + dt_now + ".csv"
+        self.logger.info("Initialising ml_ddos_random_forest "
+                         "classifier...")
         time_start = time()
         self._iscx = ISCX2012DDoS(logging)
         self._ds_data, self._ds_labels = \
@@ -180,7 +178,8 @@ class Classifier(object):
             f_train.write("{0},{1},{2}\n".format(dt_now,
                                                  "random_forest",
                                                  time_duration))
-        # TODO inform TCS that training is done
+        self.logger.info("Random Forest DDoS classifier initialised.")
+        #notify_train_complete()
 
     def classifier(self, flow):
         """
@@ -194,9 +193,9 @@ class Classifier(object):
         is part of an attack or an empty dictionary if the flow is not.
         """
         # Dictionary to hold classification results:
-        time_start = time()
         results = {}
         self.logger.debug("Classifying flow: %s", flow.fcip_hash)
+        time_start = time()
         # Gather the required flow data so that the classifier can make
         # a prediction. NOTE that the ordering of the features for
         # making a prediction must match the order of features that
@@ -220,7 +219,7 @@ class Classifier(object):
                                    dst_pckts, flow_duration]).astype(
                                                                  float32)
         # Make the prediction and return any meaningful results.
-        attack_pred = self._cls.predict(features.reshape(1, -1))
+        attack_pred = int(self._cls.predict(features.reshape(1, -1))[0])
         time_stop = time()
         # NOTE We stop recording the time here as we are only
         # concerned with classification time and not the time taken to
@@ -231,31 +230,50 @@ class Classifier(object):
                                                 "%Y-%m-%dT%H:%M:%S")
             # Record the classification time and some flow information
             # that will help in identifying the flow during analysis.
-            f_predict.write("{0},{1},{2},{3},{4},{5},{6},{7},"
-                            "{8},{9},{10}\n".format(dt_now,
-                                                    "random_forest",
-                                                    time_duration,
-                                                    flow_data["ip_A"],
-                                                    flow_data["ip_B"],
-                                                    flow_data["port_A"],
-                                                    flow_data["port_B"],
-                                                    flow_data["client"],
-                                                    flow_data["server"],
-                                                    attack_pred,
-                                                    latest_time))
+            if flow_data["proto"] != "icmp":
+                f_predict.write("{0},{1},{2},{3},{4},{5},{6},{7},"
+                                "{8},{9},{10}\n".format(dt_now,
+                                                        "random_forest",
+                                                        time_duration,
+                                                        flow_data["ip_A"],
+                                                        flow_data["ip_B"],
+                                                        flow_data["proto"],
+                                                        flow_data["port_A"],
+                                                        flow_data["port_B"],
+                                                        flow_data["client"],
+                                                        flow_data["server"],
+                                                        attack_pred,
+                                                        latest_time))
+            else:
+                f_predict.write("{0},{1},{2},{3},{4},{5},{6},{7},"
+                                "{8},{9},{10}\n".format(dt_now,
+                                                        "random_forest",
+                                                        time_duration,
+                                                        flow_data["ip_A"],
+                                                        flow_data["ip_B"],
+                                                        flow_data["proto"],
+                                                        0,
+                                                        0,
+                                                        flow_data["client"],
+                                                        flow_data["server"],
+                                                        attack_pred,
+                                                        latest_time))
         if attack_pred:
             results["ddos_attack"] = True
         return results
 
     def _train_dataset(self):
         """Train the Random Forest classifier using data from a dataset.
+
+        NOTE: Debug logging has been commented out here so that the
+        function calls do not add to the classifier initialisation time.
         """
-        self.logger.debug("Training classifier...")
+        # self.logger.debug("Training classifier...")
         if len(self._ds_data) < 1 or len(self._ds_labels) < 1:
             self.logger.critical("Attempted to train classifier with "
                                  "an empty dataset, aborting.")
             sys.exit("ABORTING: Attempted to train classifier with an "
                      "empty dataset.")
         self._cls.fit(self._ds_data, self._ds_labels)
-        self.logger.info("Training complete for Random Forest DDoS "
-                         "classifier.")
+        # self.logger.debug("Training complete for Random Forest DDoS "
+        #                  "classifier.")
