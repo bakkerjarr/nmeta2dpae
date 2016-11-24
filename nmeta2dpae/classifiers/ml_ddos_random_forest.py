@@ -131,8 +131,8 @@ class Classifier(object):
 
         dt_now = datetime.datetime.strftime(datetime.datetime.now(),
                                             "D%Y-%m-%d_h%Hm%Ms%S")
-        self._fname_train = "train_" + dt_now + ".csv"
-        self._fname_predict = "predict_" + dt_now + ".csv"
+        self._fname_train = "train_" + dt_now + "_rfor.csv"
+        self._fname_predict = "predict_" + dt_now + "_rfor.csv"
         self.logger.info("Initialising ml_ddos_random_forest "
                          "classifier...")
         time_start = time()
@@ -175,11 +175,9 @@ class Classifier(object):
         with open(self._fname_train, "a") as f_train:
             dt_now = datetime.datetime.strftime(datetime.datetime.now(),
                                                 "%Y-%m-%dT%H:%M:%S")
-            f_train.write("{0},{1},{2}\n".format(dt_now,
-                                                 "random_forest",
-                                                 time_duration))
+            f_train.write("{0},{1}\n".format(dt_now, time_duration))
         self.logger.info("Random Forest DDoS classifier initialised.")
-        #notify_train_complete()
+        notify_train_complete()
 
     def classifier(self, flow):
         """
@@ -192,10 +190,9 @@ class Classifier(object):
         It returns a dictionary specifying a key/value that the flow
         is part of an attack or an empty dictionary if the flow is not.
         """
-        # Dictionary to hold classification results:
-        results = {}
         self.logger.debug("Classifying flow: %s", flow.fcip_hash)
         time_start = time()
+        results = {}
         # Gather the required flow data so that the classifier can make
         # a prediction. NOTE that the ordering of the features for
         # making a prediction must match the order of features that
@@ -233,7 +230,6 @@ class Classifier(object):
             if flow_data["proto"] != "icmp":
                 f_predict.write("{0},{1},{2},{3},{4},{5},{6},{7},"
                                 "{8},{9},{10}\n".format(dt_now,
-                                                        "random_forest",
                                                         time_duration,
                                                         flow_data["ip_A"],
                                                         flow_data["ip_B"],
@@ -247,7 +243,6 @@ class Classifier(object):
             else:
                 f_predict.write("{0},{1},{2},{3},{4},{5},{6},{7},"
                                 "{8},{9},{10}\n".format(dt_now,
-                                                        "random_forest",
                                                         time_duration,
                                                         flow_data["ip_A"],
                                                         flow_data["ip_B"],
@@ -276,4 +271,4 @@ class Classifier(object):
                      "empty dataset.")
         self._cls.fit(self._ds_data, self._ds_labels)
         # self.logger.debug("Training complete for Random Forest DDoS "
-        #                  "classifier.")
+        #                   "classifier.")
