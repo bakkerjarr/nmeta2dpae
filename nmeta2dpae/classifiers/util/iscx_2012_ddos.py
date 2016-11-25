@@ -29,12 +29,16 @@ import numpy.core.multiarray as np_array
 # Other imports
 from datetime import datetime
 import os
+import sys
 
 
 class ISCX2012DDoS(object):
 
-    _DATASET_DIR = "/home/dev/Documents/datasets/iscx2012_ddos"
-    _DATASET_FILES = []
+    _DATASET_DIR = "/home/dev/Documents/iscxddos_train"
+    _DATASET_FILES = ["iscx2012ddos_training_set_fold_1.xml"]
+
+    # NOTE: Debug logging has been commented out here so that the
+    # function calls do not add to the classifier initialisation time.
 
     def __init__(self, logging):
         """Initialise.
@@ -58,8 +62,8 @@ class ISCX2012DDoS(object):
 
         :return: Tuple of data and labels as NumPy arrays.
         """
-        self._logging.debug("Preparing data for K Nearest Neighbours "
-                            "DDoS attack classifier.")
+        #self._logging.debug("Preparing data for K Nearest Neighbours "
+        #                    "DDoS attack classifier.")
         features = ["totalSourceBytes", "totalDestinationBytes",
                     "startDateTime", "stopDateTime"]
         selected_data = self._return_features(self._raw_data, features)
@@ -82,8 +86,8 @@ class ISCX2012DDoS(object):
 
         :return: Tuple of data and labels as NumPy arrays.
         """
-        self._logging.debug("Preparing data for Random Forest DDoS "
-                            "attack classifier.")
+        #self._logging.debug("Preparing data for Random Forest DDoS "
+        #                    "attack classifier.")
         features = ["totalSourceBytes", "totalSourcePackets",
                     "totalDestinationBytes", "totalDestinationPackets",
                     "startDateTime", "stopDateTime"]
@@ -107,8 +111,8 @@ class ISCX2012DDoS(object):
 
         :return: Tuple of data and labels as NumPy arrays.
         """
-        self._logging.debug("Preparing data for SVM (RBF kernel) "
-                            "DDoS attack classifier.")
+        #self._logging.debug("Preparing data for SVM (RBF kernel) "
+        #                    "DDoS attack classifier.")
         features = ["totalSourceBytes", "totalSourcePackets",
                     "startDateTime", "stopDateTime"]
         selected_data = self._return_features(self._raw_data, features)
@@ -141,12 +145,18 @@ class ISCX2012DDoS(object):
         :param files: Name of the file to read the data from.
         """
         for fname in files:
-            self._logging.info("Reading data from: %s", fname)
-            data_etree = etree.parse(fname)
+            #self._logging.info("Reading data from: %s", fname)
+            data_etree = None
+            try:
+                data_etree = etree.parse(fname)
+            except IOError as err:
+                self._logging.critical("Unable to open file: %s. "
+                                       "Error: %s", fname, err)
+                sys.exit(1)
             tmp_data, tmp_labels = self._etree_to_dict(data_etree)
             self._raw_data.extend(tmp_data)
             self._raw_labels.extend(tmp_labels)
-            self._logging.debug("Loading complete for file: %s", fname)
+            #self._logging.debug("Loading complete for file: %s", fname)
 
     def _etree_to_dict(self, xml_etree):
         """Convert an XML etree into a list of dicts.

@@ -281,7 +281,6 @@ class TC(object):
                                       classifier, exc_type, exc_value,
                                       exc_traceback)
                     return result
-
             #*** TBD, this will need updating for more types of return actions:
             if 'qos_treatment' in result_classifier:
                 result['qos_treatment'] = result_classifier['qos_treatment']
@@ -347,7 +346,6 @@ class TC(object):
                 result['tp_A'] = "N/A"
                 result['tp_B'] = "N/A"
                 result['flow_packets'] = self.icmp_flow.packet_count
-
         return result
 
     def _parse_dns(self, dns_data, eth_src):
@@ -359,7 +357,11 @@ class TC(object):
         if self.id_dns:
             #*** DNS:
             self.logger.debug("Is it DNS?")
-            dns = dpkt.dns.DNS(dns_data)
+            try:
+                dns = dpkt.dns.DNS(dns_data)
+            except dpkt.NeedData:
+                self.logger.debug("DNS packet with no/invalid data")
+                return {}
             queries = dns.qd
             answers = dns.an
             detail1 = []
@@ -396,11 +398,11 @@ class TC(object):
                 result = {'type': 'id', 'subtype': 'dns', 'src_mac': eth_src,
                                                 'detail1': detail1}
             else:
-                result = 0
+                result = {}
             self.logger.debug("DNS result=%s", result)
             return result
         else:
-            return 0
+            return {}
 
     def _parse_dhcp(self, udp_data, eth_src):
         """
@@ -414,7 +416,7 @@ class TC(object):
                                                 'detail1': dhcp}
             return result
         else:
-            return 0
+            return {}
 
     def _parse_arp(self, eth, eth_src):
         """
@@ -436,9 +438,9 @@ class TC(object):
                                     'detail1': arp_details}
                 return result
             else:
-                return 0
+                return {}
         else:
-            return 0
+            return {}
 
     def _parse_lldp(self, pkt, eth_src):
         """
@@ -456,7 +458,7 @@ class TC(object):
                                     'detail1': system_name}
             return result
         else:
-            return 0
+            return {}
 
     def _parse_lldp_detail(self, lldpPayload):
         """
