@@ -360,7 +360,7 @@ class TC(object):
             try:
                 dns = dpkt.dns.DNS(dns_data)
             except dpkt.NeedData:
-                self.logger.debug("DNS packet with no/invalid data")
+                self.logger.debug("DNS packet no/invalid data")
                 return {}
             queries = dns.qd
             answers = dns.an
