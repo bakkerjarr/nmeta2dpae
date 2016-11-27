@@ -9,7 +9,7 @@ nmeta_api_path: nmeta/v2/aux/
 #========== SNIFFING CONFIG ===========================
 #*** Interface names to sniff on (comma separated, no spaces)
 #sniff_if_names: eth1,eth2
-sniff_if_names: enp0s9
+sniff_if_names: enp2s0f0
 #
 #========== SYSLOG ==================================
 #*** Set to 1 if want to log to syslog:
