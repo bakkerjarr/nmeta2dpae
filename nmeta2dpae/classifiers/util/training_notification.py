@@ -21,7 +21,7 @@ import socket
 import sys
 
 _DPAE_DONE = "Training complete."
-_HOST_ADDR = "172.16.0.10"
+_HOST_ADDR = "172.16.0.1"
 _HOST_PORT = 8088
 
 

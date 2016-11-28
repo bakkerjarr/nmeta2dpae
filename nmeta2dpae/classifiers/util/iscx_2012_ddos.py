@@ -34,7 +34,7 @@ import sys
 
 class ISCX2012DDoS(object):
 
-    _DATASET_DIR = "/home/dev/Documents/iscxddos_train"
+    _DATASET_DIR = "/home/dp1/Documents/iscxddos_train"
     _DATASET_FILES = ["iscx2012ddos_training_set_fold_1.xml"]
 
     # NOTE: Debug logging has been commented out here so that the
