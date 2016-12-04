@@ -194,11 +194,11 @@ class Classifier(object):
         """Train the SVM (RBF kernel) classifier using data from a
         dataset.
         """
-        # self.logger.debug("Training classifier...")
+        self.logger.debug("Training classifier...")
         if len(self._ds_data) < 1 or len(self._ds_labels) < 1:
             self.logger.critical("Attempted to train classifier with "
                                  "an empty dataset, aborting.")
             sys.exit("ABORTING: Attempted to train classifier with an "
                      "empty dataset.")
         self._cls.fit(self._ds_data, self._ds_labels)
-        # self.logger.debug("Training complete for SVM DDoS classifier.")
+        self.logger.debug("Training complete for SVM DDoS classifier.")
