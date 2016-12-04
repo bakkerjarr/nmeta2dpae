@@ -42,8 +42,11 @@ from flow import icmp_flow
 from flow import tcp_flow
 from flow import udp_flow
 
-# For mining stored flow data
-from data_miner import DataMiner
+# Imports for evaluation
+from time import clock
+from time import time
+from classifiers.util.training_notification import notify_train_complete
+import datetime
 
 #*** For importing custom classifiers:
 import importlib
@@ -69,7 +72,6 @@ class TC(object):
     """
 
     def __init__(self, _config):
-        # TODO Should the config be stored
         self._config = _config
         #*** Get logging config values from config class:
         _logging_level_s = _config.get_value \
@@ -141,9 +143,9 @@ class TC(object):
         self.udp_flow = udp_flow.UDPFlow(self.logger, _mongo_addr,
                                          _mongo_port)
 
-        # Instantiate a DataMiner object for classifiers to mine
-        # database information with.
-        self._data_miner = DataMiner(_config)
+        # Evaluation: File names for results
+        self._fname_predict = ""
+        self._fname_train = ""
 
     def instantiate_classifiers(self, _classifiers):
         """
@@ -181,7 +183,26 @@ class TC(object):
             #*** Dynamically instantiate class 'Classifier':
             self.logger.debug("Instantiating module class")
             class_ = getattr(module, 'Classifier')
+            proc_time_start = clock()
+            wall_time_start = time()
             self.classifiers.append(class_(self._config))
+            proc_time_stop = clock()
+            wall_time_stop = time()
+            duration_proc = proc_time_stop - proc_time_start
+            duration_wall = wall_time_stop - wall_time_start
+            dt_now = datetime.datetime.strftime(datetime.datetime.now(),
+                                                "D%Y-%m-%d_h%Hm%Ms%S")
+            self._fname_train = "train_{0}_{1}.csv".format(dt_now,
+                                                           module_name)
+            self._fname_predict = "predict_{0}_{1}.csv".format(dt_now,
+                                                               module_name)
+            with open(self._fname_train, "a") as f_train:
+                dt_now = datetime.datetime.strftime(datetime.datetime.now(),
+                                                    "%Y-%m-%dT%H:%M:%S")
+                f_train.write("{0},{1},{2}\n".format(dt_now,
+                                                     duration_proc,
+                                                     duration_wall))
+            notify_train_complete()
 
     def classify_dpkt_wrapper(self, pkt, pkt_receive_timestamp, if_name):
         """
@@ -203,6 +224,8 @@ class TC(object):
         Perform traffic classification on a packet
         using dpkt for packet parsing
         """
+        proc_time_start = clock()
+        wall_time_start = time()
         result = {'type': 'none', 'subtype': 'none', 'actions': 0}
         ip = 0
         udp = 0
@@ -224,7 +247,6 @@ class TC(object):
                 tcp = ip.data
                 tcp_src = tcp.sport
                 tcp_dst = tcp.dport
-
             elif ip.p == _IP_PROTO_UDP:
                 udp = ip.data
                 udp_src = udp.sport
@@ -287,8 +309,8 @@ class TC(object):
                 result['actions'] = 1
                 result['type'] = 'treatment'
             elif "ddos_attack" in result_classifier:
-                result["type"] = "Attack"
-                result["subtype"] = "DDoS"
+                result['type'] = "Attack"
+                result["DDoS"] = str(result_classifier["ddos_attack"])
 
         #*** Suppress Elephant flows:
         #***  TBD, do on more than just IPv4 TCP...:
@@ -346,6 +368,29 @@ class TC(object):
                 result['tp_A'] = "N/A"
                 result['tp_B'] = "N/A"
                 result['flow_packets'] = self.icmp_flow.packet_count
+            proc_time_stop = clock()
+            wall_time_stop = time()
+            duration_proc = proc_time_stop - proc_time_start
+            duration_wall = wall_time_stop - wall_time_start
+            with open(self._fname_predict, "a") as f_predict:
+                dt_now = datetime.datetime.strftime(datetime.datetime.now(),
+                                                    "%Y-%m-%dT%H:%M:%S")
+                # Record the classification time and some flow information
+                # that will help in identifying the flow during analysis.
+                f_predict.write("{0},{1},{2},{3},{4},{5},{6},{7},"
+                                "{8},{9},{10},"
+                                "{11}\n".format(dt_now,
+                                                pkt_receive_timestamp,
+                                                result["ip_A"],
+                                                result["ip_B"],
+                                                result["proto"],
+                                                result["tp_A"],
+                                                result["tp_B"],
+                                                flow_type.client,
+                                                flow_type.server,
+                                                duration_proc,
+                                                duration_wall,
+                                                result["DDoS"]))
         return result
 
     def _parse_dns(self, dns_data, eth_src):
