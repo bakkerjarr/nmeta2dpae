@@ -202,7 +202,7 @@ class TC(object):
                 f_train.write("{0},{1},{2}\n".format(dt_now,
                                                      duration_proc,
                                                      duration_wall))
-            notify_train_complete()
+        notify_train_complete()
 
     def classify_dpkt_wrapper(self, pkt, pkt_receive_timestamp, if_name):
         """
