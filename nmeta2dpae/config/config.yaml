@@ -2,7 +2,7 @@
 #*** Written in YAML
 #
 #========== nmeta Controller ========================
-nmeta_controller_address: http://172.16.0.10 # Jarrod: changed from original value set by Matt
+nmeta_controller_address: http://172.16.0.10
 nmeta_controller_port: 8080
 nmeta_api_path: nmeta/v2/aux/
 #
@@ -40,7 +40,7 @@ classifier_logging_level_s: INFO
 #
 #========== CONSOLE LOGGING =========================
 #*** Set to 1 if want to log to console:
-console_log_enabled: 1
+console_log_enabled: 0
 #
 #*** Set to 1 if you want colorised logs in terminal:
 coloredlogs_enabled: 1
